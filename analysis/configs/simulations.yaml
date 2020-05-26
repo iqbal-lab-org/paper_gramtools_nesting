@@ -1,0 +1,8 @@
+datasets : "analysis/input_data/datasets.tsv"
+container : "container/built/singu.img"
+
+k : 10
+
+num_simu_paths : 5
+simu_read_params: {err_scaling: [0, -30], fcov: [20, 60]}
+read_len : 75

@@ -1,0 +1,119 @@
+import os
+from pathlib import Path
+
+configfile: "analysis/configs/simulations.yaml"
+container : config["container"]
+
+#_____Set up output paths______#
+output_base = Path("analysis/outputs/simulations")
+output_build = output_base / "gram_build"
+output_paths = output_base / "paths"
+output_reads = output_base / "reads"
+output_gtyping = output_base / "genotyping"
+output_eval = output_base / "evaluation"
+
+for variable in filter(lambda name: name.startswith("output"), dir()):
+	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
+
+include: "utils.py"
+
+rule all:
+		input:
+				f'{output_eval}/all.tsv'
+
+rule gram_build:
+	input:
+		get_data_path
+	output:
+		directory(f'{output_build}/{config["k"]}_{{dataset}}/prg')
+	params:
+		k = config["k"]
+	shell:
+		"gramtools build --gram_dir {output} --ref {input}/ref.fa --prg {input}/prg --kmer_size {params.k}"
+
+
+rule simulate_paths:
+	input:
+		rules.gram_build.output
+	output:
+		truth_json=f'{output_paths}/{{dataset}}.json',
+		truth_fasta=f'{output_paths}/{{dataset}}.fasta',
+	params:
+		output_dir=output_paths,
+		num_paths=config["num_simu_paths"],
+		paths_dir=f'{output_paths}/all_paths'
+	shell:
+		"gramtools simulate --prg {input} -o {params.output_dir} --sample_id {wildcards.dataset} -n {params.num_paths} --force;"
+
+
+checkpoint split_multifasta_paths:
+	input:
+		expand(f'{output_paths}/{{dataset}}.fasta', dataset = datasets)
+	output:
+		paths_dir=directory(f'{output_paths}/all_paths')
+	shell:
+		"""
+		paths_dir={output.paths_dir}
+		mkdir -p $paths_dir
+		for fname in {input}; do
+			dataset=$(basename $fname)
+			dataset=${{dataset%.*}}
+			awk '/^>/{{s=\"'$paths_dir'/'$dataset'_\"++d\".fa\"}} {{print > s}}' $fname
+		done
+		"""
+		# Latter line puts each record in its own numbered fasta
+
+rule simulate_reads:
+	input:
+		f'{output_paths}/all_paths/{{dataset}}_{{num}}.fa'
+	output:
+		f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq'
+
+	params:
+		output_dir=f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}',
+		read_len=config["read_len"]
+	shell:
+		"mkdir -p {params.output_dir};"
+		"art_illumina -ss HS25 -i {input} -l {params.read_len} -f {wildcards.cov} -qs {wildcards.err} -o {params.output_dir}/{wildcards.num};"
+		"rm {params.output_dir}/{wildcards.num}.aln"
+
+
+rule genotype:
+	input:
+		f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq'
+	output:
+		f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_genotyped.json'
+	params:
+		build_dir=f'{output_build}/{config["k"]}_{{dataset}}',
+		output_dir=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}'
+	shell:
+		"mkdir -p {params.output_dir};"
+		"gramtools genotype -i {params.build_dir} -o {params.output_dir}"
+		" --reads {input} --sample_id {wildcards.dataset}_{wildcards.num} --ploidy haploid --seed 42 --force;"
+		"cp {params.output_dir}/genotype/genotyped.json {output} && rm -r {params.output_dir}"
+
+rule evaluate:
+	input:
+		f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_genotyped.json'
+	output:
+		f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_eval.tsv'
+	script:
+		'scripts/evaluate.py'
+
+def aggregate_simu_paths(wildcards):
+	checkpoint_output = checkpoints.split_multifasta_paths.get(**wildcards).output.paths_dir
+	res = expand(f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_eval.tsv', 
+			dataset = list(datasets.keys()),
+			err = config["simu_read_params"]["err_scaling"], cov = config["simu_read_params"]["fcov"],
+			num = glob_wildcards(f'{checkpoint_output}/{{dataset}}_{{num}}.fa').num)
+	#print(res)
+	return res
+
+rule aggregate:
+	input:
+			aggregate_simu_paths
+	output:
+			f'{output_eval}/all.tsv'
+	shell:
+			'cat {input} > {output}'
+

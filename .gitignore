@@ -1,0 +1,14 @@
+# Envs
+venv
+container/built
+
+# Editor
+*~
+*.swp
+
+# Results
+analysis/outputs
+.snakemake
+
+# scratch
+tmp_work
