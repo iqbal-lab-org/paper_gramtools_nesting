@@ -1,6 +1,6 @@
 import json
 import sys
-from typing import Tuple
+from typing import NamedTuple
 
 import pandas as pd
 import click
@@ -11,8 +11,9 @@ columns = [
     "simu_path",
     "err_rate",
     "fcov",
-    "is_null_gt",
-    "correct",
+    "res_has_call",
+    "truth_has_call",
+    "res_is_correct",
     "lvl_1",
     "GC",
     "GCP",
@@ -29,16 +30,21 @@ def find_sample_index(truth_json, sample_id: str) -> int:
     assert sample_index > -1
     return sample_index
 
+class AlleleCall(NamedTuple):
+    has_call: bool
+    allele: str
 
-def get_called_allele(sample_index: int, site_json) -> Tuple[str,str]:
+
+def get_called_allele(sample_index: int, site_json) -> AlleleCall: 
     allele_index = site_json["GT"][sample_index]
     assert len(allele_index) == 1
     allele_index = allele_index[0]
 
-    if allele_index == None:
-        return "", "1"
+    allele = ""
+    if allele_index is not None:
+        allele = site_json["ALS"][allele_index]
 
-    return site_json["ALS"][allele_index], "0"
+    return AlleleCall(allele_index is not None, allele)
 
 
 def print_cols(ctx, param, value):
@@ -57,8 +63,6 @@ def print_cols(ctx, param, value):
 @click.argument('res_json', type=click.Path(exists=True))
 @click.argument('output_path')
 def main(prg_name, num, err_rate, fcov, truth_json, res_json, output_path):
-
-
     result_template["prg"] = prg_name
     result_template["simu_path"] = str(num)
     result_template["err_rate"] = str(err_rate)
@@ -82,33 +86,29 @@ def main(prg_name, num, err_rate, fcov, truth_json, res_json, output_path):
 
     for i in range(len(truth_json["Sites"])):
         next_result = result_template.copy()
-        true_allele, true_null_call = get_called_allele(truth_sample_index, truth_json["Sites"][i])
+        true_call: AlleleCall = get_called_allele(truth_sample_index, truth_json["Sites"][i])
 
         called_site_json = res_json["Sites"][i]
-        called_allele, is_null_call = get_called_allele(0, called_site_json)
+        res_call = get_called_allele(0, called_site_json)
 
-        next_result["is_null_gt"] = is_null_call
+        next_result["res_has_call"] = res_call.has_call
+        next_result["truth_has_call"] = true_call.has_call
 
-        if called_allele == true_allele and is_null_call == true_null_call:
-            next_result["correct"] = "1"
-        else:
-            next_result["correct"] = "0"
+        next_result["res_is_correct"] = res_call.allele == true_call.allele
 
         if lvl1_sites == {"all"} or i in lvl1_sites:
             next_result["lvl_1"] = "1"
         else:
             next_result["lvl_1"] = "0"
 
-        next_result["GC"] = str(called_site_json["GT_CONF"][0])
+        next_result["GC"] = called_site_json["GT_CONF"][0]
         GCP_entry = called_site_json.get("GCP")
         if GCP_entry is not None:
-            next_result["GCP"] = str(GCP_entry[0])
+            next_result["GCP"] = GCP_entry[0]
 
-        next_result["edit_dist"] = str(
-            edlib.align(called_allele, true_allele)["editDistance"]
-        )
+        next_result["edit_dist"] = edlib.align(res_call.allele, true_call.allele)["editDistance"]
 
-        fout.write("\t".join(next_result.values()) + "\n")
+        fout.write("\t".join(map(str,next_result.values())) + "\n")
 
     fout.close()
 

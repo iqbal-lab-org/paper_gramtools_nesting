@@ -12,6 +12,7 @@ output_paths = output_base / "paths"
 output_reads = output_base / "reads"
 output_gtyping = output_base / "genotyping"
 output_eval = output_base / "evaluation"
+output_plots = output_base / "plots"
 
 for variable in filter(lambda name: name.startswith("output"), dir()):
 	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
@@ -20,7 +21,7 @@ include: "utils.py"
 
 rule all:
 		input:
-				f'{output_eval}/all.tsv'
+			f'{output_plots}/{GMTOOLS_COMMIT}'
 
 rule gram_build:
 	input:
@@ -84,7 +85,7 @@ rule genotype:
 	input:
 		f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq'
 	output:
-		f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_genotyped.json'
+		f'{output_gtyping}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_genotyped.json'
 	params:
 		build_dir=f'{output_build}/{config["k"]}_{{dataset}}',
 		output_dir=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}'
@@ -97,10 +98,10 @@ rule genotype:
 
 rule evaluate:
 	input:
-		res_json=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_genotyped.json',
+		res_json=f'{output_gtyping}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_genotyped.json',
 		truth_json=rules.simulate_paths.output.truth_json
 	output:
-		f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_eval.tsv'
+		f'{output_eval}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_eval.tsv'
 	params:
 		eval_script=f'{config["scripts"]}/simulations/evaluate.py'
 	shell:
@@ -109,7 +110,7 @@ rule evaluate:
 
 def aggregate_simu_paths(wildcards):
 	checkpoint_output = checkpoints.split_multifasta_paths.get(**wildcards).output.paths_dir
-	res = expand(f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_eval.tsv', 
+	res = expand(f'{output_eval}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_eval.tsv', 
 			dataset = list(datasets.keys()),
 			err = config["simu_read_params"]["err_scaling"], cov = config["simu_read_params"]["fcov"],
 			num = glob_wildcards(f'{checkpoint_output}/{{dataset}}_{{num}}.fa').num)
@@ -120,10 +121,19 @@ rule aggregate:
 	input:
 		aggregate_simu_paths
 	output:
-		f'{output_eval}/all.tsv'
+		f'{output_eval}/{GMTOOLS_COMMIT}/all.tsv'
 	params:
 		eval_script=f'{config["scripts"]}/simulations/evaluate.py'
 	shell:
 		"python3 {params.eval_script} -p > {output};"	
 		'cat {input} >> {output}'
 
+rule plot:
+	input:
+		rules.aggregate.output
+	output:
+		directory(f'{output_plots}/{GMTOOLS_COMMIT}')
+	params:
+		plot_script=f'{config["scripts"]}/simulations/plot.R'
+	shell:
+		"mkdir -p {output} && Rscript {params.plot_script} {input} {output}"
