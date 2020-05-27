@@ -1,0 +1,2 @@
+container : "container/built/singu.img"
+scripts: "analysis/scripts"

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+configfile: "analysis/configs/common.yaml"
 configfile: "analysis/configs/simulations.yaml"
 container : config["container"]
 
@@ -25,11 +26,12 @@ rule gram_build:
 	input:
 		get_data_path
 	output:
-		directory(f'{output_build}/{config["k"]}_{{dataset}}/prg')
+		f'{output_build}/{config["k"]}_{{dataset}}/prg'
 	params:
-		k = config["k"]
+		k = config["k"],
+		gram_dir=directory(f'{output_build}/{config["k"]}_{{dataset}}'),
 	shell:
-		"gramtools build --gram_dir {output} --ref {input}/ref.fa --prg {input}/prg --kmer_size {params.k}"
+		"gramtools build --gram_dir {params.gram_dir} --ref {input}/ref.fa --prg {input}/prg --kmer_size {params.k} --force"
 
 
 rule simulate_paths:
@@ -43,7 +45,7 @@ rule simulate_paths:
 		num_paths=config["num_simu_paths"],
 		paths_dir=f'{output_paths}/all_paths'
 	shell:
-		"gramtools simulate --prg {input} -o {params.output_dir} --sample_id {wildcards.dataset} -n {params.num_paths} --force;"
+		"gramtools simulate --prg {input} -o {params.output_dir} --sample_id {wildcards.dataset} -n {params.num_paths} --force"
 
 
 checkpoint split_multifasta_paths:
@@ -90,15 +92,20 @@ rule genotype:
 		"mkdir -p {params.output_dir};"
 		"gramtools genotype -i {params.build_dir} -o {params.output_dir}"
 		" --reads {input} --sample_id {wildcards.dataset}_{wildcards.num} --ploidy haploid --seed 42 --force;"
-		"cp {params.output_dir}/genotype/genotyped.json {output} && rm -r {params.output_dir}"
+		"cp {params.output_dir}/genotype/genotyped.json {output} && rm -r {params.output_dir};"
+		"rm {input}"
 
 rule evaluate:
 	input:
-		f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_genotyped.json'
+		res_json=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_genotyped.json',
+		truth_json=rules.simulate_paths.output.truth_json
 	output:
 		f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}_eval.tsv'
-	script:
-		'scripts/evaluate.py'
+	params:
+		eval_script=f'{config["scripts"]}/simulations/evaluate.py'
+	shell:
+		'python3 {params.eval_script} -n {wildcards.dataset} --num {wildcards.num} '
+		'-e {wildcards.err} -c {wildcards.cov} {input.truth_json} {input.res_json} {output} '
 
 def aggregate_simu_paths(wildcards):
 	checkpoint_output = checkpoints.split_multifasta_paths.get(**wildcards).output.paths_dir
@@ -111,9 +118,12 @@ def aggregate_simu_paths(wildcards):
 
 rule aggregate:
 	input:
-			aggregate_simu_paths
+		aggregate_simu_paths
 	output:
-			f'{output_eval}/all.tsv'
+		f'{output_eval}/all.tsv'
+	params:
+		eval_script=f'{config["scripts"]}/simulations/evaluate.py'
 	shell:
-			'cat {input} > {output}'
+		"python3 {params.eval_script} -p > {output};"	
+		'cat {input} >> {output}'
 
