@@ -33,9 +33,11 @@ get_precision <- function(classif){
 }
 
 data <- read_tsv(argv$input_tsv)
+gmtools_commit <- basename(argv$output_dir)
 
 # Add classification
 data <- data %>% mutate(classif = pmap_chr(list(res_has_call, res_is_correct), get_classif))
+
 
 # Compute and plot precision/recall
 recalls <- data %>% group_by(prg, err_rate, fcov) %>% summarise(metric = "recall", score = get_recall(classif))
@@ -43,13 +45,23 @@ precisions <- data %>% group_by(prg, err_rate, fcov) %>% summarise(metric = "pre
 total <- rbind(recalls, precisions)
 avg_recall = get_recall(data$classif)
 avg_precision = get_precision(data$classif)
-plot_title <- sprintf("avg recall=%.2f avg precision=%.2f",avg_recall,avg_precision)
+plot_title <- sprintf("avg recall=%.2f avg precision=%.2f, gmtools_commit: %s",avg_recall,avg_precision, gmtools_commit)
 
 t <- ggplot(total, aes(prg,score)) + geom_bar(aes(fill=metric), stat="identity",position="dodge")
 t <- t + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both) + labs(title = plot_title)
 ggsave(file.path(argv$output_dir,"precision_recall.pdf"),width = 10, height = 8, plot=t)
 
-# Plot call correctness metric distributions
+# Plot correctness vs metric distributions
 correctness <- data %>% filter(classif == "TP" | classif == "FP")
-boxplot <- ggplot(correctness, aes(classif, GC)) + geom_boxplot() + labs(title="Genotype confidence distributions")
-ggsave(file.path(argv$output_dir,"GC_distrib.pdf"),width = 8, height = 6, plot=boxplot)
+correctness <- correctness %>% mutate(log_GC = log(GC))
+
+plot_title <- sprintf("genotype confidence x correctness, gmtools_commit: %s", gmtools_commit)
+GC_boxplot <- ggplot(correctness, aes(classif, log_GC)) + geom_boxplot() + labs(title=plot_title)
+GC_boxplot <- GC_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
+ggsave(file.path(argv$output_dir,"GC_distrib.pdf"),width = 8, height = 6, plot=GC_boxplot)
+
+
+plot_title <- sprintf("genotype confidence percentile  x correctness, gmtools_commit: %s", gmtools_commit)
+GCP_boxplot <- ggplot(correctness, aes(classif, GCP)) + geom_boxplot() + labs(title=plot_title)
+GCP_boxplot <- GCP_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
+ggsave(file.path(argv$output_dir,"GCP_distrib.pdf"),width = 8, height = 6, plot=GCP_boxplot)

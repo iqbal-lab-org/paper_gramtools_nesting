@@ -11,6 +11,7 @@ columns = [
     "simu_path",
     "err_rate",
     "fcov",
+    "nesting",
     "res_has_call",
     "truth_has_call",
     "res_is_correct",
@@ -59,14 +60,16 @@ def print_cols(ctx, param, value):
 @click.option('--num',help='simu path number',required=True, type=int)
 @click.option('-e','--err_rate',required=True, type=int)
 @click.option('-c','--fcov',required=True, type=int)
+@click.option('--nesting',default="", type=str)
 @click.argument('truth_json', type=click.Path(exists=True))
 @click.argument('res_json', type=click.Path(exists=True))
 @click.argument('output_path')
-def main(prg_name, num, err_rate, fcov, truth_json, res_json, output_path):
+def main(prg_name, num, err_rate, fcov, nesting, truth_json, res_json, output_path):
     result_template["prg"] = prg_name
     result_template["simu_path"] = str(num)
     result_template["err_rate"] = str(err_rate)
     result_template["fcov"] = str(fcov)
+    result_template["nesting"] = nesting
 
 
     ## Load up truth json
@@ -102,7 +105,7 @@ def main(prg_name, num, err_rate, fcov, truth_json, res_json, output_path):
             next_result["lvl_1"] = "0"
 
         next_result["GC"] = called_site_json["GT_CONF"][0]
-        GCP_entry = called_site_json.get("GCP")
+        GCP_entry = called_site_json.get("GT_CONF_PERCENTILE")
         if GCP_entry is not None:
             next_result["GCP"] = GCP_entry[0]
 
