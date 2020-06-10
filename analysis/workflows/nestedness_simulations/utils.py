@@ -4,8 +4,8 @@ from gramtools import version
 
 input_table = pd.read_csv(config["datasets"], sep="\t")
 datasets = set(input_table["name"])
-conditions = list(set(input_table["nesting"]))
-assert(len(conditions) == 2) 
+conditions = ["nonested", "nested"] # Ordered, so that simulate paths from non-nested prg and induce them in nested prg
+assert(set(conditions) == set(input_table["nesting"]))
 path_access = dict(zip(input_table["name"] + "_" + input_table["nesting"],input_table["base_path"]))
 
 def get_data_path(wildcards):

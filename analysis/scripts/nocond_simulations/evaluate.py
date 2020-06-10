@@ -1,6 +1,6 @@
 import json
 import sys
-from typing import NamedTuple
+from typing import NamedTuple, Union
 
 import pandas as pd
 import click
@@ -19,6 +19,12 @@ columns = [
     "GC",
     "GCP",
     "edit_dist",
+    "truth_allele",
+    "gt_allele",
+    "cov_gt_allele",
+    "cov_other_alleles",
+    "site_num",
+    "site_pos"
 ]
 result_template = {k: "None" for k in columns}
 
@@ -32,8 +38,11 @@ def find_sample_index(truth_json, sample_id: str) -> int:
     return sample_index
 
 class AlleleCall(NamedTuple):
-    has_call: bool
+    gt: Union[int, None]
     allele: str
+
+    def has_call(self):
+        return self.gt is not None
 
 
 def get_called_allele(sample_index: int, site_json) -> AlleleCall: 
@@ -45,7 +54,7 @@ def get_called_allele(sample_index: int, site_json) -> AlleleCall:
     if allele_index is not None:
         allele = site_json["ALS"][allele_index]
 
-    return AlleleCall(allele_index is not None, allele)
+    return AlleleCall(allele_index, allele)
 
 
 def print_cols(ctx, param, value):
@@ -85,7 +94,9 @@ def main(prg_name, num, err_rate, fcov, nesting, truth_json, res_json, output_pa
     ## Evaluate calls
     fout = open(output_path, "w")
     # Below sample_id assumes gramtools simulate was called with that --sample_id
-    truth_sample_index = find_sample_index(truth_json, sample_id = f'{prg_name}{num}')
+    sample_id = f'{prg_name}{num}'
+    truth_sample_index = find_sample_index(truth_json, sample_id)
+    assert(sample_id == res_json["Samples"][0]["Name"])
 
     for i in range(len(truth_json["Sites"])):
         next_result = result_template.copy()
@@ -94,8 +105,8 @@ def main(prg_name, num, err_rate, fcov, nesting, truth_json, res_json, output_pa
         called_site_json = res_json["Sites"][i]
         res_call = get_called_allele(0, called_site_json)
 
-        next_result["res_has_call"] = res_call.has_call
-        next_result["truth_has_call"] = true_call.has_call
+        next_result["res_has_call"] = res_call.has_call()
+        next_result["truth_has_call"] = true_call.has_call()
 
         next_result["res_is_correct"] = res_call.allele == true_call.allele
 
@@ -110,6 +121,15 @@ def main(prg_name, num, err_rate, fcov, nesting, truth_json, res_json, output_pa
             next_result["GCP"] = GCP_entry[0]
 
         next_result["edit_dist"] = edlib.align(res_call.allele, true_call.allele)["editDistance"]
+        next_result["truth_allele"] = true_call.allele
+        next_result["gt_allele"] = res_call.allele
+        if res_call.has_call():
+            next_result["cov_gt_allele"] = called_site_json["COV"][0][res_call.gt]
+            next_result["cov_other_alleles"] = called_site_json["DP"][0] - next_result["cov_gt_allele"]
+        else:
+            next_result["cov_other_alleles"] = called_site_json["DP"][0]
+        next_result["site_num"] = i
+        next_result["site_pos"] = called_site_json["POS"]
 
         fout.write("\t".join(map(str,next_result.values())) + "\n")
 

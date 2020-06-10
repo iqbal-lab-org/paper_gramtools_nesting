@@ -40,20 +40,24 @@ rule simulate_paths:
 		expand(f'{output_build}/k{config["k"]}_{{dataset}}_{{nesting}}/prg',nesting=conditions,allow_missing=True)
 	output:
 		expand(f'{output_paths}/{{dataset}}_{{nesting}}.json',nesting=conditions,allow_missing=True),
-		simu_fasta=f'{output_paths}/{{dataset}}.fasta',
+		simu_fasta=f'{output_paths}/{{dataset}}_nonested.fasta',
 	params:
 		sample_ids=expand('{dataset}_{nesting}',nesting=conditions,allow_missing=True),
 		output_dir=output_paths,
 		num_paths=config["num_simu_paths"],
 		paths_dir=f'{output_paths}/all_paths'
 	shell:
-		"gramtools simulate --prg {input[0]} -o {params.output_dir} --sample_id {params.sample_ids[0]} -n {params.num_paths} --force;"
-		"gramtools simulate --prg {input[1]} -o {params.output_dir} --sample_id {params.sample_ids[1]} -i {output.simu_fasta} --force"
+		# The `mv`s are because we want the JSON sample names to only have dataset in name, but the filenames to also have the nesting condition
+		"gramtools simulate --prg {input[0]} -o {params.output_dir} --sample_id {wildcards.dataset} -n {params.num_paths} --force;"
+		"mv {params.output_dir}/{wildcards.dataset}.json {params.output_dir}/{params.sample_ids[0]}.json;"
+		"mv {params.output_dir}/{wildcards.dataset}.fasta {params.output_dir}/{params.sample_ids[0]}.fasta;"
+		"gramtools simulate --prg {input[1]} -o {params.output_dir} --sample_id {wildcards.dataset} -i {output.simu_fasta} --force;"
+		"mv {params.output_dir}/{wildcards.dataset}.json {params.output_dir}/{params.sample_ids[1]}.json;"
 
 
 checkpoint split_multifasta_paths:
 	input:
-		expand(f'{output_paths}/{{dataset}}.fasta', dataset = datasets)
+		expand(f'{output_paths}/{{dataset}}_nonested.fasta', dataset = datasets)
 	output:
 		paths_dir=directory(f'{output_paths}/all_paths')
 	shell:
@@ -63,6 +67,7 @@ checkpoint split_multifasta_paths:
 		for fname in {input}; do
 			dataset=$(basename $fname)
 			dataset=${{dataset%.*}}
+			dataset=${{dataset/_nonested/}}
 			awk '/^>/{{s=\"'$paths_dir'/'$dataset'_\"++d\".fa\"}} {{print > s}}' $fname
 		done
 		"""
@@ -95,7 +100,7 @@ rule genotype:
 	shell:
 		"mkdir -p {params.output_dir};"
 		"gramtools genotype -i {params.build_dir} -o {params.output_dir}"
-		" --reads {input} --sample_id {wildcards.dataset}_{wildcards.num} --ploidy haploid --seed 42 --force;"
+		" --reads {input} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --force;"
 		"cp {params.output_dir}/genotype/genotyped.json {output}; cp {params.output_dir}/read_stats.json {params.read_stats_output};"
 		"rm -r {params.output_dir};"
 
@@ -114,7 +119,7 @@ rule evaluate:
 def aggregate_simu_paths(wildcards):
 	checkpoint_output = checkpoints.split_multifasta_paths.get(**wildcards).output.paths_dir
 	res = expand(f'{output_eval}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv', 
-			dataset = list(datasets.keys()),
+			dataset = datasets,
 			err = config["simu_read_params"]["err_scaling"], cov = config["simu_read_params"]["fcov"],
 			nesting = conditions,
 			num = glob_wildcards(f'{checkpoint_output}/{{dataset}}_{{num}}.fa').num)
@@ -134,11 +139,12 @@ rule aggregate:
 
 rule plot:
 	input:
-		rules.aggregate.output
+		to_eval=rules.aggregate.output,
+		nested_json=f'{output_paths}/{list(datasets)[0]}_nested.json'
 	output:
 		f'{output_plots}/{GMTOOLS_COMMIT}/precision_recall.pdf'
 	params:
-		plot_script=f'{config["scripts"]}/nocond_simulations/plot.R',
+		plot_script=f'{config["scripts"]}/nestedness_simulations/plot.R',
 		output_dir=f'{output_plots}/{GMTOOLS_COMMIT}'
 	shell:
-		"mkdir -p {params.output_dir} && Rscript {params.plot_script} {input} {params.output_dir}"
+		"mkdir -p {params.output_dir} && Rscript {params.plot_script} {input.to_eval} {params.output_dir} {input.nested_json}"
