@@ -1,4 +1,4 @@
-datasets : "analysis/input_data/nestedness.tsv"
+datasets : "analysis/input_data/nestedness/datasets.tsv"
 
 k : 10
 

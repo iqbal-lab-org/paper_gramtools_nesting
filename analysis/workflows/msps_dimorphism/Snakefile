@@ -1,0 +1,55 @@
+from pathlib import Path
+
+WORKFLOW = "msps_dimorphism"
+
+configfile: "analysis/configs/common.yaml"
+configfile: f"analysis/configs/{WORKFLOW}.yaml"
+container: config["container"]
+
+#_____Set up output paths______#
+output_base = Path(f"analysis/outputs/{WORKFLOW}")
+output_gram_build = output_base / "gram_build"
+output_gtyping = output_base / "gtyping"
+
+for variable in filter(lambda name: name.startswith("output"), dir()):
+	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
+
+include: "utils.py"
+
+rule all:
+	input:
+		expand(f"{output_gtyping}/{{sample}}/res.{{ext}}",sample = get_bams(config["pf3k"]["bams_filelist"]), ext = ["vcf.gz","json"])
+
+rule build:
+	input:
+		prg=config["prg"],
+		ref=config["prg_ref"]
+	output:
+		f'{output_gram_build / "prg"}'
+	resources:
+		mem_mb=10000
+	shell:
+		"gramtools build --prg {input.prg} --ref {input.ref} --gram_dir {output_gram_build} --kmer_size 10 --force"
+
+rule genotype:
+	input:
+		gram_build_done=rules.build.output[0],
+		reads=f'{config["pf3k"]["bams_basedir"]}/{{sample}}.bam',
+	output:	
+		vcf=f"{output_gtyping}/{{sample}}/res.vcf.gz",
+		json=f"{output_gtyping}/{{sample}}/res.json",
+		read_stats=f"{output_gtyping}/{{sample}}/read_stats.json",
+
+	params:
+		geno_dir=f"{output_gtyping}/{{sample}}"
+	threads: 10
+	resources:
+		mem_mb=10000
+	shell:
+		"""
+		gramtools genotype --gram_dir {output_gram_build} --reads {input.reads} --sample_id {wildcards.sample} --ploidy haploid --seed 42 --threads {threads} -o {params.geno_dir}
+		mv {params.geno_dir}/genotype/genotyped.vcf.gz {output.vcf}	
+		mv {params.geno_dir}/genotype/genotyped.json {output.json}	
+		mv {params.geno_dir}/read_stats.json {output.read_stats}	
+		rm -r {params.geno_dir}
+		"""

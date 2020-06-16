@@ -1,0 +1,6 @@
+pf3k:
+    bams_filelist: "analysis/input_data/plasmodium/pf3k/bam_list.txt"
+    bams_basedir: "analysis/input_data/plasmodium/pf3k/bams"
+
+prg: "analysis/input_data/plasmodium/prgs/DBLMSPs/mn5_mml7/prg"
+prg_ref: "analysis/input_data/plasmodium/prgs/DBLMSPs/ref.fa"

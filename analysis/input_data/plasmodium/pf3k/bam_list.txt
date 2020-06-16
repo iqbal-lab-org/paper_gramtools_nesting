@@ -1,0 +1,2 @@
+bam1.bam
+bam2.bam
