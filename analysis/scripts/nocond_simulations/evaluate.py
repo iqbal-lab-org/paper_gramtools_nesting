@@ -24,7 +24,8 @@ columns = [
     "cov_gt_allele",
     "cov_other_alleles",
     "site_num",
-    "site_pos"
+    "site_pos",
+    "ambiguous"
 ]
 result_template = {k: "None" for k in columns}
 
@@ -130,6 +131,11 @@ def main(prg_name, num, err_rate, fcov, nesting, truth_json, res_json, output_pa
             next_result["cov_other_alleles"] = called_site_json["DP"][0]
         next_result["site_num"] = i
         next_result["site_pos"] = called_site_json["POS"]
+
+        if "AMBIG" in called_site_json["FT"][0]:
+            next_result["ambiguous"] = 1
+        else:
+            next_result["ambiguous"] = 0
 
         fout.write("\t".join(map(str,next_result.values())) + "\n")
 

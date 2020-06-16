@@ -33,37 +33,6 @@ get_precision <- function(classif){
   return((TP + TN) / (TP + TN + FP))
 }
 
-# _______Filtering out ambiguous sites________ #
-
-  # Produce a mapping from a child site to its level1 parent site
-get_child_to_par <- function(nested_json){
-  intermediate_list <- lapply(nested_json$Child_Map, unlist)
-  child_to_par = c()
-  its_names = c()
-  for (parent in names(intermediate_list)){
-    children = unlist(intermediate_list[parent])
-    its_names <- c(its_names, children)
-    child_to_par <- c(child_to_par,rep(parent, length(children)))
-  }
-  names(child_to_par) <- its_names
-  return(child_to_par)
-}
-
-# Add an ambiguity classification
-get_ambiguity <- function(qsimu_path, qsite_num, qerr_rate, classif, nesting){
-  if (nesting != "nested" || classif != "FP") {return(FALSE)}
-  parent_site_num = as.integer(child_to_par[as.character(qsite_num)])
-  if (is.na(parent_site_num)) {return(FALSE)}
-  up_one = parent_site_num
-  while (! is.na(up_one)){
-    up_one = as.integer(child_to_par[as.character(up_one)])
-    if (! is.na(up_one)) parent_site_num = up_one
-  }
-  parent_classif = filter(nested_data, simu_path == qsimu_path & site_num == parent_site_num & err_rate == qerr_rate)$classif 
-  if (parent_classif == "TP" || parent_classif == "FN") {return(TRUE)}
-  return(FALSE)
-}
-
 
 #_______Plots_______#
 #Compute and plot precision/recall
@@ -103,6 +72,13 @@ plot_GCP <- function(data, title, argv, prg_name, gmtools_commit){
   ggsave(file.path(argv$output_dir,title),width = 8, height = 6, plot=GCP_boxplot)
 }
 
+print_prec_recall <- function(data){
+  data <- data %>% mutate(classif = pmap_chr(list(res_has_call, res_is_correct), get_classif))
+  recalls <- data %>% group_by(nesting, err_rate, fcov) %>% summarise(metric = "recall", score = get_recall(classif))
+  precisions <- data %>% group_by(nesting, err_rate, fcov) %>% summarise(metric = "precision", score = get_precision(classif))
+  print(precisions)
+  print(recalls)
+}
 
 
 #_____Main code: data load, process, plot____#
@@ -116,18 +92,16 @@ data <- data %>% filter(prg == prg_name)
 
 # Add classification
 data <- data %>% mutate(classif = pmap_chr(list(res_has_call, res_is_correct), get_classif))
-nested_data <- filter(data, nesting == "nested")
-# Add ambiguity
-child_to_par <- get_child_to_par(nested_json)
-data <- data %>% mutate(ambiguous = pmap_chr(list(simu_path, site_num, err_rate, classif, nesting), get_ambiguity))
 
-data_noambi = filter(data, ambiguous == FALSE)
+print(sprintf("Num filtered out ambiguous sites: %d out of %d",table(data$ambiguous)[2], dim(data)[1]))
+data_noambi <- filter(data, ambiguous == 0)
+data_lvl1 <- filter(data_noambi, lvl_1 == 1)
 
-plot_prec_recall(data, "precision_recall.pdf", argv, prg_name, gmtools_commit)
-plot_prec_recall(data_noambi, "precision_recall_noambiguous.pdf", argv, prg_name, gmtools_commit)
+plot_prec_recall(data_noambi, "precision_recall.pdf", argv, prg_name, gmtools_commit)
+plot_prec_recall(data_lvl1, "precision_recall_lvl1.pdf", argv, prg_name, gmtools_commit)
 
-plot_GC(data, "GC_distrib.pdf", argv, prg_name, gmtools_commit)
-plot_GC(data_noambi, "GC_distrib_noambi.pdf", argv, prg_name, gmtools_commit)
+plot_GC(data_noambi, "GC_distrib.pdf", argv, prg_name, gmtools_commit)
+plot_GC(data_lvl1, "GC_distrib_lvl1.pdf", argv, prg_name, gmtools_commit)
 
-plot_GCP(data, "GCP_distrib.pdf", argv, prg_name, gmtools_commit)
-plot_GCP(data_noambi, "GCP_distrib_noambi.pdf", argv, prg_name, gmtools_commit)
+plot_GCP(data_noambi, "GCP_distrib.pdf", argv, prg_name, gmtools_commit)
+plot_GCP(data_lvl1, "GCP_distrib_lvl1.pdf", argv, prg_name, gmtools_commit)
