@@ -41,13 +41,13 @@ rule genotype:
 		read_stats=f"{output_gtyping}/{{sample}}/read_stats.json",
 
 	params:
-		geno_dir=f"{output_gtyping}/{{sample}}"
+		geno_dir=f"{output_gtyping}/{{sample}}/geno"
 	threads: 10
 	resources:
 		mem_mb=10000
 	shell:
 		"""
-		gramtools genotype --gram_dir {output_gram_build} --reads {input.reads} --sample_id {wildcards.sample} --ploidy haploid --seed 42 --threads {threads} -o {params.geno_dir}
+		gramtools genotype --gram_dir {output_gram_build} --reads {input.reads} --sample_id {wildcards.sample} --ploidy haploid --seed 42 --max_threads {threads} -o {params.geno_dir} --force
 		mv {params.geno_dir}/genotype/genotyped.vcf.gz {output.vcf}	
 		mv {params.geno_dir}/genotype/genotyped.json {output.json}	
 		mv {params.geno_dir}/read_stats.json {output.read_stats}	
