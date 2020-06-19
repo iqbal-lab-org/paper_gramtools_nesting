@@ -11,6 +11,7 @@ analysis/input_data/plasmodium/pf3k
 
 # Results
 analysis/outputs
+analysis/logs
 .snakemake
 
 # scratch

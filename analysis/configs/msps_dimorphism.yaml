@@ -4,3 +4,4 @@ pf3k:
 
 prg: "analysis/input_data/plasmodium/prgs/DBLMSPs/mn5_mml7/prg"
 prg_ref: "analysis/input_data/plasmodium/prgs/DBLMSPs/ref.fa"
+genes_bed: "analysis/input_data/plasmodium/prgs/DBLMSPs/genes_in_prg.bed"

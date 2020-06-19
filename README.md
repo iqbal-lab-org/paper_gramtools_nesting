@@ -74,8 +74,14 @@ INFO:root:Cumulative num sites: 1717
 msps_dimorphism
 -----------------
 
-Practical notes:
+Practical notes
+````````````````
 
 * Watch out in ref.fa, which is constructed from full.bed and Plasmo 3D7 ref in input_data/plasmodium/DBLMSPs, by default using this will name the CHROM in the vcf the gene name + sliced coordinates. Make sure there is a space between 'Pf3D7_10' and the sliced coords.
 
 * input_data/plasmodium/prgs/DBLMSPs has a full.bed which describes the prg/ref.fa relative to 3D7 and a genes_in_prg.bed describing the genes only (not with the 5k flanks as in full.bed) relative to the prg. I checked that the sequences are the same.
+
+TODOs
+```````
+
+[] Possible rmduplicates step when catting all fa sequences together. RAxML complains about duplicates in the msa otherwise. It does produce a deduplicated file as well by default, disabled using `--no-seq-check`.

@@ -6,19 +6,33 @@ configfile: "analysis/configs/common.yaml"
 configfile: f"analysis/configs/{WORKFLOW}.yaml"
 container: config["container"]
 
+include: "utils.py"
+
 #_____Set up output paths______#
 output_base = Path(f"analysis/outputs/{WORKFLOW}")
 output_gram_build = output_base / "gram_build"
 output_gtyping = output_base / "gtyping"
+output_msas = output_base / "msas"
+output_sequences = output_msas / "sequences"
+output_trees = output_base / "trees"
 
 for variable in filter(lambda name: name.startswith("output"), dir()):
 	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
 
-include: "utils.py"
+genes = get_tree_genes(config["genes_bed"]) # in utils.py
+
+for gene in genes:
+	(output_sequences / gene).mkdir(exist_ok=True)
+	(output_trees / gene).mkdir(exist_ok=True)
+
+
+samples = get_bams(config["pf3k"]["bams_filelist"]) # in utils.py
+
 
 rule all:
 	input:
-		f"{output_gtyping}/combined.json"
+		res_json=f"{output_gtyping}/combined.json",
+		res_trees=expand(f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}", gene = genes),
 
 rule build:
 	input:
@@ -37,6 +51,7 @@ rule genotype:
 		reads=f'{config["pf3k"]["bams_basedir"]}/{{sample}}.bam',
 	output:	
 		vcf=f"{output_gtyping}/{{sample}}/res.vcf.gz",
+		vcf_index=f"{output_gtyping}/{{sample}}/res.vcf.gz.csi",
 		json=f"{output_gtyping}/{{sample}}/res.json",
 		read_stats=f"{output_gtyping}/{{sample}}/read_stats.json",
 
@@ -52,11 +67,14 @@ rule genotype:
 		mv {params.geno_dir}/genotype/genotyped.json {output.json}	
 		mv {params.geno_dir}/read_stats.json {output.read_stats}	
 		rm -r {params.geno_dir}
+		bcftools index {output.vcf}
 		"""
 
+
 rule combine_calls:
+	"""Makes combined JSON for analysing"""
 	input:
-		expand(f"{output_gtyping}/{{sample}}/res.{{ext}}",sample = get_bams(config["pf3k"]["bams_filelist"]), ext = ["json"])
+		expand(f"{output_gtyping}/{{sample}}/res.{{ext}}",sample = samples, ext = ["json"])
 	output:
 		f"{output_gtyping}/combined.json"
 	params:
@@ -69,3 +87,62 @@ rule combine_calls:
 		combine_jvcfs {params.tmp_fofn} {output}
 		rm {params.tmp_fofn}
 		"""
+
+rule make_seq_slices:
+	input:
+		prg_ref = config["prg_ref"],
+		genes_bed = config["genes_bed"],
+		sample_vcf = rules.genotype.output.vcf
+	output:
+		sequences=expand(f"{output_sequences}/{{gene}}/{{sample}}.fa",gene=genes, allow_missing=True)
+	params:
+		outdir=f"{output_sequences}"
+	shell:
+		"""
+		IFS="\n"; for gene_line in $(cat {input.genes_bed})
+		do
+			IFS="\t"; elems=($gene_line)	
+			adj_start=$((${{elems[1]}} + 1))
+			reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+			fout={params.outdir}/${{elems[3]}}/{wildcards.sample}.fa
+			samtools faidx {input.prg_ref} $reg | bcftools consensus -s {wildcards.sample} {input.sample_vcf} |
+				sed 's/>.*/>'{wildcards.sample}'/' > $fout
+		done
+		"""
+
+rule cat_sequences:
+	input:
+		sequences=expand(f"{output_sequences}/{{gene}}/{{sample}}.fa",
+			sample = samples, allow_missing=True)
+	output:
+		f"{output_sequences}/{{gene}}/all_seqs.fa"
+	shell:
+		"cat {input} > {output}"
+
+rule msa_genes:
+	input:
+		rules.cat_sequences.output[0]
+	output:
+		f"{output_msas}/{{gene}}.msa"
+	resources:
+		mem_mb=7000
+	shell:
+		"mafft {input} > {output}"
+
+rule phylo_trees:
+	input:
+		f"{output_msas}/{{gene}}.msa"
+	output:
+		f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}"
+	params:
+		outdir=f"{output_trees}/{{gene}}"
+	resources:
+		mem_mb=10000
+	threads: 8
+	shell:
+		"""
+		if [ ! -e {output} ]; then
+			raxmlHPC-PTHREADS -s {input} -n {wildcards.gene} -m GTRCAT -p 42 --no-seq-check -w $(realpath {params.outdir}) -T {threads}
+		fi
+		"""
+	
