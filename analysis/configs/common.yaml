@@ -1,2 +1,3 @@
-container : "container/built/singu.img"
+#container : "container/built/singu.img"
+container : "container/built/singu_writable"
 scripts: "analysis/scripts"

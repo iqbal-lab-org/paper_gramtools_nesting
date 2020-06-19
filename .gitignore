@@ -7,7 +7,7 @@ container/built
 *.swp
 
 # Inputs
-analysis/input_data/plasmodium/pf3k/bams
+analysis/input_data/plasmodium/pf3k
 
 # Results
 analysis/outputs

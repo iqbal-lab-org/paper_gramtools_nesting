@@ -2,7 +2,7 @@
 # Tested on: singularity v3.4.0-1
 
 BootStrap: docker
-From: ubuntu:latest  
+From: ubuntu:xenial  
 
 %post
     export DEBIAN_FRONTEND=noninteractive
@@ -69,8 +69,8 @@ From: ubuntu:latest
 	/*************/
 	/* gramtools */
 	/*************/
-	apt-get install -y g++-8
-    ln -sf /usr/bin/g++-8 /usr/bin/g++ # Default to g++-8
+	#apt-get install -y g++-8
+    #ln -sf /usr/bin/g++-8 /usr/bin/g++ # Default to g++-8
 
 	# gramtools::cortex
 	apt-get install -y python2.7 python2.7-dev r-base
@@ -83,11 +83,12 @@ From: ubuntu:latest
 
 	# Install encode_prg
 	git clone https://github.com/iqbal-lab-org/gramtools
-	cd gramtools && git checkout c4f21b8ade0de0f7e8386b6df4e86d849d3045ba
-	mkdir cmake_build && cd cmake_build
+	cd gramtools && git checkout 7ed1721c21899cad385f88acb0b5dcff92dd2851
+	mkdir cmake-build-release && cd cmake-build-release
 	cmake .. -DCMAKE_BUILD_TYPE=REL_WITH_ASSERTS
-	make -j 4 encode_prg
-	cp ../libgramtools/submods/encode_prg/encode_prg /usr/bin/
+	make -j 4 encode_prg combine_jvcfs
+	cp ../libgramtools/submods/encode_prg /usr/bin/
+	cp ../libgramtools/submods/combine_jvcfs /usr/bin/
 	
 	# Make gram
 	make -j 4 gram

@@ -71,3 +71,11 @@ INFO:root:Cumulative num sites: 1717
 --> Nested prg has 1.96 x more variant sites, and 0.68 x the num of characters!
 
 
+msps_dimorphism
+-----------------
+
+Practical notes:
+
+* Watch out in ref.fa, which is constructed from full.bed and Plasmo 3D7 ref in input_data/plasmodium/DBLMSPs, by default using this will name the CHROM in the vcf the gene name + sliced coordinates. Make sure there is a space between 'Pf3D7_10' and the sliced coords.
+
+* input_data/plasmodium/prgs/DBLMSPs has a full.bed which describes the prg/ref.fa relative to 3D7 and a genes_in_prg.bed describing the genes only (not with the 5k flanks as in full.bed) relative to the prg. I checked that the sequences are the same.

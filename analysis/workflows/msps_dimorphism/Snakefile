@@ -18,7 +18,7 @@ include: "utils.py"
 
 rule all:
 	input:
-		expand(f"{output_gtyping}/{{sample}}/res.{{ext}}",sample = get_bams(config["pf3k"]["bams_filelist"]), ext = ["vcf.gz","json"])
+		f"{output_gtyping}/combined.json"
 
 rule build:
 	input:
@@ -52,4 +52,20 @@ rule genotype:
 		mv {params.geno_dir}/genotype/genotyped.json {output.json}	
 		mv {params.geno_dir}/read_stats.json {output.read_stats}	
 		rm -r {params.geno_dir}
+		"""
+
+rule combine_calls:
+	input:
+		expand(f"{output_gtyping}/{{sample}}/res.{{ext}}",sample = get_bams(config["pf3k"]["bams_filelist"]), ext = ["json"])
+	output:
+		f"{output_gtyping}/combined.json"
+	params:
+		tmp_fofn=f"{output_gtyping}/fofn.txt"
+	resources:
+		mem_mb=5000
+	shell:
+		"""
+		echo {input} | tr ' ' '\n' > {params.tmp_fofn}
+		combine_jvcfs {params.tmp_fofn} {output}
+		rm {params.tmp_fofn}
 		"""
