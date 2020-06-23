@@ -117,6 +117,7 @@ class TestMakeSiteGraph:
     def test_apply_region_filter(self, site_graph_data):
         region = Region("seg1", 4, 4)
         result = make_site_graph(self.jvcf, region)
+        assert len(result.vs) == 1
         assert sum(result.vs["populated"]) == 1
 
     def test_apply_region_filter2(self, site_graph_data):
@@ -124,10 +125,14 @@ class TestMakeSiteGraph:
         # which has nested sites below it; these get processed too.
         region = Region("seg1", 4, 5)
         result = make_site_graph(self.jvcf, region)
-        assert sum(result.vs["populated"]) == 4
-        assert result.vs["nesting_lvl"] == [0, 0, 0, 1, 1, 2, 3, 0]
-        assert result.degree(mode="in") == [0, 0, 0, 0, 1, 1, 1, 1]
-        assert result.degree(mode="out") == [0, 0, 0, 1, 1, 1, 1, 0]
+        print(result.vs["nesting_lvl"])
+        assert len(result.vs) == 5
+        assert sum(result.vs["populated"]) == 5
+        assert result.vs["nesting_lvl"] == [1, 1, 2, 3, 1]
+        assert result.degree(mode="in") == [0, 1, 1, 1, 1]
+        assert result.degree(mode="out") == [1, 1, 1, 1, 0]
+        # site indices of kept nodes
+        assert result.vs["name"] == [3, 4, 5, 6, 7]
 
     def test_make_whole_graph(self, site_graph_data):
         result = make_site_graph(self.jvcf, Region())
