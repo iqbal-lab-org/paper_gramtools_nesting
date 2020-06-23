@@ -1,19 +1,14 @@
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
+library(argparser, quietly=TRUE)
 
-BiocManager::install("ggtree")
+p <- arg_parser("Plot phylo tree")
+p <- add_argument(p, "phylo_tree", help="in Newick format")
+p <- add_argument(p, "output_fname", help="will save with extension of .pdf")
+
+argv <- parse_args(p)
 
 require(ape)
-tr_DBL_MSP <- read.tree("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/msps_dimorphism/trees_on_cluster/DBL_DBLMSP/RAxML_bestTree.DBL_DBLMSP")
-tr_MSP <- read.tree("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/msps_dimorphism/trees_on_cluster/DBLMSP/RAxML_bestTree.DBLMSP")
-
-tr_DBL_MSP2 <- read.tree("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/msps_dimorphism/trees_on_cluster/DBL_DBLMSP2/RAxML_bestTree.DBL_DBLMSP2")
-tr_MSP2 <- read.tree("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/msps_dimorphism/trees_on_cluster/DBLMSP2/RAxML_bestTree.DBLMSP2")
-
 require(ggtree)
-ggtree(tr_DBL_MSP)
-ggtree(tr_MSP)
 
-ggtree(tr_DBL_MSP2)
-ggtree(tr_MSP2)
-#ggtree(tr_MSP2) + geom_tiplab(size=3)
+input_tree <- read.tree(argv$phylo_tree)
+display <- ggtree(input_tree) + ggtitle(paste("Tree: ", basename(argv$phylo_tree)))
+ggsave(paste(argv$output_fname, ".pdf", sep=""), display)

@@ -15,6 +15,9 @@ output_gtyping = output_base / "gtyping"
 output_msas = output_base / "msas"
 output_sequences = output_msas / "sequences"
 output_trees = output_base / "trees"
+output_drawn_trees = output_trees / "plots"
+output_tree_splits = output_trees / "splits"
+output_graphs = output_base / "graphs"
 
 for variable in filter(lambda name: name.startswith("output"), dir()):
 	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
@@ -31,8 +34,8 @@ samples = get_bams(config["pf3k"]["bams_filelist"]) # in utils.py
 
 rule all:
 	input:
-		res_json=f"{output_gtyping}/combined.json",
-		res_trees=expand(f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}", gene = genes),
+		graphs=expand(f"{output_graphs}/{{gene}}/{{filename}}.gml", gene = genes, filename = ["all_samples", "partition_1", "partition_2"]),
+		res_tree_plots=expand(f"{output_drawn_trees}/{{gene}}.pdf", gene = genes),
 
 rule build:
 	input:
@@ -144,5 +147,54 @@ rule phylo_trees:
 		if [ ! -e {output} ]; then
 			raxmlHPC-PTHREADS -s {input} -n {wildcards.gene} -m GTRCAT -p 42 --no-seq-check -w $(realpath {params.outdir}) -T {threads}
 		fi
+		"""
+	
+rule draw_trees:
+	input:
+		f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}"
+	output:
+		f"{output_drawn_trees}/{{gene}}.pdf"
+	params:
+		script=f'{config["scripts"]}/{WORKFLOW}/plot_tree.R'
+	shell:
+		"""
+		output_prefix={output}
+		output_prefix=${{output_prefix%.pdf}}
+		Rscript {params.script} {input} ${{output_prefix}}
+		"""
+
+rule tree_basal_split:
+	input:
+		f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}"
+	output:
+		f"{output_tree_splits}/{{gene}}.basal_split"
+	params:
+		script=f'{config["scripts"]}/{WORKFLOW}/tree_partition.py'
+	shell:
+		"python3 {params.script} {input} {output}"
+
+rule build_graphs:
+	input:
+		res_json=f"{output_gtyping}/combined.json",
+		genes_bed=config["genes_bed"],
+		tree_split=f"{output_tree_splits}/{{gene}}.basal_split",
+	output:
+		all_samples=f"{output_graphs}/{{gene}}/all_samples.gml",
+		partition1=f"{output_graphs}/{{gene}}/partition_1.gml",
+		partition2=f"{output_graphs}/{{gene}}/partition_2.gml",
+	params:
+		output_dir=f"{output_graphs}/{{gene}}",
+		script=f'{config["scripts"]}/{WORKFLOW}/get_site_diversity_graphs.py'
+	shell:
+		"""
+		# Produce region
+		match=$(grep -w {wildcards.gene} {input.genes_bed})
+		if [[ -z ${{match}} ]]; then echo "ERROR: No match of gene name in bed file"; exit 1; fi
+		IFS="\t"; elems=($match)	
+		adj_start=$((${{elems[1]}} + 1))
+		reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+
+		python3 {params.script} {input.res_json} {params.output_dir} --region $reg # for all_samples
+		python3 {params.script} {input.res_json} {params.output_dir} --region $reg -p {input.tree_split} # for partitions
 		"""
 	
