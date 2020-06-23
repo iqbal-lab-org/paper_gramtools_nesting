@@ -2,6 +2,10 @@
 venv
 container/built
 
+# Python
+__pycache__
+*.egg-info
+
 # Editor
 *~
 *.swp
