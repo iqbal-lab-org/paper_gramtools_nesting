@@ -18,6 +18,7 @@ for variable in filter(lambda name: name.startswith("output"), dir()):
 	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
 
 include: "utils.py"
+include: "../common_utils.py"
 
 rule all:
 		input:

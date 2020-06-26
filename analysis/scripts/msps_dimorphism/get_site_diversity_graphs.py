@@ -128,6 +128,7 @@ def site_graph_copy(other: Graph) -> Graph:
     for edge in other.es:
         result.add_edges([(edge.source, edge.target)])
     result["names"] = other["names"]
+    result.vs["name"] = other.vs["name"]  # To keep info on absolute site index
     return result
 
 
@@ -282,7 +283,7 @@ def Kullback_Leibler(d1: Distrib, d2: Distrib) -> float:
 
 def Jensen_Shannon(freqs_1: FreqDict, freqs_2: FreqDict) -> float:
     all_keys = set(freqs_1.keys()).union(set(freqs_2.keys()))
-    all_keys = list(all_keys)
+    all_keys = sorted(list(all_keys))  # Make sure the gt/hapg are output in order
     normed_1 = normalise_distrib(freqs_1, all_keys)
     normed_2 = normalise_distrib(freqs_2, all_keys)
 

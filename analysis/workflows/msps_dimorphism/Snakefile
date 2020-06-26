@@ -7,9 +7,11 @@ configfile: f"analysis/configs/{WORKFLOW}.yaml"
 container: config["container"]
 
 include: "utils.py"
+include: "../common_utils.py"
+print(GMTOOLS_COMMIT)
 
 #_____Set up output paths______#
-output_base = Path(f"analysis/outputs/{WORKFLOW}")
+output_base = Path(f"analysis/outputs/{WORKFLOW}/{GMTOOLS_COMMIT}")
 output_gram_build = output_base / "gram_build"
 output_gtyping = output_base / "gtyping"
 output_msas = output_base / "msas"
