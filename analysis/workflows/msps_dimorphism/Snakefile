@@ -1,4 +1,5 @@
 from pathlib import Path
+from subprocess import run as sp_run, PIPE
 
 WORKFLOW = "msps_dimorphism"
 
@@ -8,7 +9,7 @@ container: config["container"]
 
 include: "utils.py"
 include: "../common_utils.py"
-print(GMTOOLS_COMMIT)
+
 
 #_____Set up output paths______#
 output_base = Path(f"analysis/outputs/{WORKFLOW}/{GMTOOLS_COMMIT}")
