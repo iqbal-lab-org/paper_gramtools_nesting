@@ -1,3 +1,13 @@
 #!/usr/bin/env bash
-bsub.py 5 "msps_dimorphism" -o run/logs/msps_dimorphism.o -e run/logs/msps_dimorphism.e "snakemake -s analysis/workflow/msps_dimorphism/Snakefile --use-singularity --profile lsf --verbose --latency-wait 10"
+
+WORKFLOW=$1
+
+function usage(){
+	echo "usage: $0 workflow_name"
+	exit 1
+}
+
+if [[ -z ${WORKFLOW} ]]; then usage; fi
+
+bsub.py 5 "${WORKFLOW}" -o "run/logs/${WORKFLOW}.o" -e "run/logs/${WORKFLOW}.e" "snakemake -s analysis/workflow/${WORKFLOW}/Snakefile --use-singularity --profile lsf --verbose --latency-wait 25"
 
