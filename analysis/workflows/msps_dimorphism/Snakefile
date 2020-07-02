@@ -1,5 +1,4 @@
 from pathlib import Path
-from subprocess import run as sp_run, PIPE
 
 WORKFLOW = "msps_dimorphism"
 
@@ -22,8 +21,7 @@ output_drawn_trees = output_trees / "plots"
 output_tree_splits = output_trees / "splits"
 output_graphs = output_base / "graphs"
 
-for variable in filter(lambda name: name.startswith("output"), dir()):
-	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
+mk_output_dirs()
 
 genes = get_tree_genes(config["genes_bed"]) # in utils.py
 

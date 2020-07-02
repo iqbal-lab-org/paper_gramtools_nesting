@@ -1,0 +1,11 @@
+starting_prg:
+    fasta_ref: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta.gz"
+    gene_list: "analysis/input_data/make_prgs/gene_lists/pf_4surfants.txt"
+    var_regions: "analysis/outputs/make_prgs/pf_4surfants/beds/genes.bed"
+    prg: "analysis/outputs/make_prgs/pf_4surfants/prg_mn5_mml7"
+
+kmer_size: 10
+
+sample_tsv: "analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv"
+assemblies_dir: "analysis/input_data/pfalciparum/pacb_ilmn/pacb_assemblies"
+ilmn_reads_dir: "analysis/input_data/pfalciparum/pacb_ilmn/ilmn_reads"
