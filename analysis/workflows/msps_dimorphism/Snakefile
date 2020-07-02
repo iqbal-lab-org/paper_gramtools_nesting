@@ -158,12 +158,13 @@ rule draw_trees:
 	output:
 		f"{output_drawn_trees}/{{gene}}.pdf"
 	params:
-		script=f'{config["scripts"]}/{WORKFLOW}/plot_tree.R'
+		script=f'{config["scripts"]}/{WORKFLOW}/plot_tree.R',
+		gmtools_commit=GMTOOLS_COMMIT
 	shell:
 		"""
 		output_prefix={output}
 		output_prefix=${{output_prefix%.pdf}}
-		Rscript {params.script} {input} ${{output_prefix}}
+		Rscript {params.script} {input} ${{output_prefix}} 'gmtools_commit:{params.gmtools_commit}'
 		"""
 
 rule tree_basal_split:
