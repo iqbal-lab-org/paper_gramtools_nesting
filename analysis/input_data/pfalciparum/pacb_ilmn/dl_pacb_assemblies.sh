@@ -1,5 +1,5 @@
 set -eu
-base_dir="/nfs/leia/research/iqbal/bletcher/analyses/nesting_paper"
+base_dir="/nfs/research1/zi/bletcher/analyses/nesting_paper"
 
 output_dir="${base_dir}/analysis/input_data/pfalciparum/pacb_ilmn/pacb_assemblies"
 mkdir -p "$output_dir"
