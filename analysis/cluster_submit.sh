@@ -9,5 +9,5 @@ function usage(){
 
 if [[ -z ${WORKFLOW} ]]; then usage; fi
 
-bsub.py 5 "${WORKFLOW}" -o "run/logs/${WORKFLOW}.o" -e "run/logs/${WORKFLOW}.e" "snakemake -s analysis/workflow/${WORKFLOW}/Snakefile --use-singularity --profile lsf --verbose --latency-wait 25"
+bsub.py 5 "${WORKFLOW}" -o "analysis/logs/${WORKFLOW}.o" -e "analysis/logs/${WORKFLOW}.e" "snakemake -s analysis/workflows/${WORKFLOW}/Snakefile --use-singularity --profile lsf --verbose --latency-wait 25"
 
