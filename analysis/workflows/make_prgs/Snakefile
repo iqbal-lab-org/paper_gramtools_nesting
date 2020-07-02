@@ -1,0 +1,202 @@
+import re
+from pathlib import Path
+
+include: "utils.py"
+
+configfile: "analysis/configs/common.yaml"
+configfile: "analysis/configs/starting_prg.yaml"
+container: config["singularity"]
+
+# Paths
+gene_list = Path(config["genes"]).stem
+output_base = Path(f'{config["output_dir"]}/starting_prg/{gene_list}')
+output_base.mkdir(exist_ok=True, parents=True)
+
+output_bed = output_base / "beds"
+output_portions = output_base / "sample_portions"
+output_msas = output_base / "msas"
+output_prgs = output_base / "prgs"
+
+with open(config["genes"]) as f:
+	genes = f.read().splitlines()
+
+sample_name_matcher = re.compile("([^_]+)_")
+
+vcfs = load_vcf_names(config["pf_release_3"]["cortex_vcf_list"])
+
+rule all:
+	input:
+		expand(f"{str(output_base)}/prg_mn{{max_nest}}_mml{{min_match}}",
+		max_nest=config["make_prg"]["max_nest"],
+		min_match=config["make_prg"]["min_match"])
+
+
+rule make_beds:
+	input:
+		faidx=config["pf_release_3"]["fai"],
+		ref_annot=config["pf_release_3"]["gff"],
+		genes=config["genes"]
+	output:
+		ori_var_bed = f'{str(output_bed)}/genes.bed',
+		var_bed = f'{str(output_bed)}/vars_{config["flank_size"]}.bed',
+		nonvar_bed = f'{str(output_bed)}/nonvars.bed',
+		full_bed = f'{str(output_bed)}/full.bed',
+	params:
+		extension_script = f'{config["scripts"]}/extend_intervals.py',
+		flank_size = config["flank_size"],
+	shell:
+		"""
+		mkdir -p {output_bed}
+		genes=($(cat {input.genes}))
+		grep_cmd="grep {input.ref_annot}"
+		> {output.ori_var_bed}
+		for gene in ${{genes[@]}}
+			do $grep_cmd -e "$gene;" | awk '{{$4-=1;print $1"\t"$4"\t"$5"\t""'$gene'"}}' >> {output.ori_var_bed}
+		done
+
+		bedtools sort -i {output.ori_var_bed} -faidx {input.faidx} > tmp.bed
+		mv tmp.bed {output.ori_var_bed}
+
+		python3 {params.extension_script} {output.ori_var_bed} {params.flank_size} {output.var_bed} --force
+		
+		bedtools complement -i {output.var_bed} -g {input.faidx} | awk 'BEGIN{{l=1}}{{print $0"\t""nonvar_"l;l+=1}}' > {output.nonvar_bed}
+
+		cat {output.nonvar_bed} {output.var_bed} > tmp.bed
+		bedtools sort -i tmp.bed -faidx {input.faidx} > {output.full_bed}
+
+		rm tmp.bed
+		"""
+
+rule make_var_sample_portions:
+	input:
+		var_bed = rules.make_beds.output.var_bed,
+		ref_genome = config["pf_release_3"]["fasta"],
+		vcf_file = lambda wildcards: vcfs[wildcards.sample]
+	params:
+		outdir=f"{str(output_portions)}/{{sample}}"
+	output:
+		temp(expand(f"{str(output_portions)}/{{sample}}/{{gene}}.fa",gene = genes, allow_missing=True))
+	shell:
+		"""
+		mkdir -p {params.outdir}
+		clean_vcf={params.outdir}/clean.vcf
+		bcftools view -f PASS {input.vcf_file} | bcftools norm -c x -f {input.ref_genome} -Oz > ${{clean_vcf}}.gz
+		bcftools index ${{clean_vcf}}.gz
+		IFS="\n"; for gene_line in $(cat {input.var_bed})
+		do
+			IFS="\t"; elems=($gene_line)	
+			adj_start=$((${{elems[1]}} + 1))
+			reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+			fout={params.outdir}/${{elems[3]}}.fa
+			samtools faidx {input.ref_genome} $reg | bcftools consensus -s {wildcards.sample} ${{clean_vcf}}.gz |
+				sed 's/>.*/>'{wildcards.sample}'/' > $fout
+		done
+		"""
+
+rule make_var_ref_portions:
+	input:
+		var_bed = rules.make_beds.output.var_bed,
+		ref_genome = config["pf_release_3"]["fasta"],
+	params:
+		outdir=f"{str(output_portions)}/ref"
+	output:
+		expand(f'{str(output_portions)}/ref/{{gene}}.fa',gene=genes)
+	shell:
+		"""
+		mkdir -p {params.outdir}
+
+		IFS="\n"; for gene_line in $(cat {input.var_bed})
+		do
+			IFS="\t"; elems=($gene_line)	
+			adj_start=$((${{elems[1]}} + 1))
+			reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+			fout={params.outdir}/${{elems[3]}}.fa
+			samtools faidx {input.ref_genome} $reg | sed 's/>.*/>ref/' > $fout
+		done
+		"""
+
+rule cat_var_portions:
+	input:
+		ref=f'{str(output_portions)}/ref/{{gene}}.fa',
+		samples=expand(f"{str(output_portions)}/{{sample}}/{{gene}}.fa",sample = vcfs.keys(), allow_missing=True)
+	output:
+		seqs=f"{str(output_msas)}/{{gene}}.fa",
+	run:
+		with open(output.seqs, "w") as fout:
+			for portion in [input.ref] + input.samples:
+				with open(portion) as fin:
+					sequence = fin.read()	
+				fout.write(sequence)
+
+
+
+rule make_msas:
+	input:
+		seqs=rules.cat_var_portions.output.seqs
+	output:
+		msa=f"{str(output_msas)}/{{gene}}.msa"
+	resources:
+		mem_mb=5000
+	shell:
+		"mafft {input.seqs} > {output.msa}"
+		
+
+rule make_var_prgs:
+	input:
+		rules.make_msas.output.msa
+	params:
+		outdir=f"{str(output_prgs)}/mn{{max_nest}}_mml{{min_match}}/{{gene}}",
+	output:
+		simple_out=f'{str(output_prgs)}/mn{{max_nest}}_mml{{min_match}}/{{gene}}.bin'
+	resources:
+		mem_mb=5000
+	shell:
+		"""
+		mkdir -p {params.outdir}
+		matched_out={params.outdir}/{wildcards.gene}.max_nest{wildcards.max_nest}.min_match{wildcards.min_match}.bin
+		make_prg prg_from_msa {input} -p {params.outdir}/{wildcards.gene} --max_nesting {wildcards.max_nest} --min_match_length {wildcards.min_match}
+		mv $matched_out {output.simple_out}
+		#pref=${{matched_out%.*}}
+		#rm ${{pref}}*
+		"""
+
+			
+rule make_nonvar_prgs:
+	input:	
+		nonvars=rules.make_beds.output.nonvar_bed,
+		ref_genome = config["pf_release_3"]["fasta"],
+	output:
+		touch(f"{str(output_prgs)}/nonvars/nonvars_done.txt")
+	params:
+		# The directory NEEDS to be called nonvars
+		# as that's what searched by concat_prg.py script
+		prg_dir=f"{str(output_prgs)}/nonvars"
+	shell:
+		"""
+		mkdir -p {params.prg_dir}
+		IFS="\n"; for nonvar_line in $(cat {input.nonvars})
+		do
+			IFS="\t"; elems=($nonvar_line)	
+			adj_start=$((${{elems[1]}} + 1))
+			prg_name="${{elems[3]}}"
+			reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+			samtools faidx {input.ref_genome} $reg |
+				encode_prg -o {params.prg_dir}/${{prg_name}}.bin
+		done
+		"""
+
+rule concat_prgs:
+	input:
+		nonvars=rules.make_nonvar_prgs.output[0],
+		vars=expand(rules.make_var_prgs.output.simple_out, gene = genes, allow_missing=True),
+		full_bed=rules.make_beds.output.full_bed
+	output:
+		f"{str(output_base)}/prg_mn{{max_nest}}_mml{{min_match}}"
+	params:
+		concat_prg_script = f'{config["scripts"]}/concat_prgs.py',
+		var_prg_dir = f'{output_prgs}/mn{{max_nest}}_mml{{min_match}}'
+	resources:
+		mem_mb=5000
+	shell:
+		"python3 {params.concat_prg_script} {params.var_prg_dir} {input.full_bed} {output};"
+		"#rm {output_prgs}/nonvar_*"

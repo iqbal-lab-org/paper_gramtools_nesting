@@ -11,7 +11,9 @@ __pycache__
 *.swp
 
 # Inputs
-analysis/input_data/plasmodium/pf3k
+analysis/input_data/pfalciparum/pf3k
+analysis/input_data/pfalciparum/pacb_ilmn/*reads*
+analysis/input_data/pfalciparum/pacb_ilmn/*assemblies*
 
 # Results
 analysis/outputs

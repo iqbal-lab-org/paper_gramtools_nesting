@@ -1,3 +1,4 @@
 scripts: "analysis/scripts"
+gram_builds_dir: "analysis/outputs/gram_builds"
 #container : "container/built/singu.sif"
 container : "container/built/singu_writable"

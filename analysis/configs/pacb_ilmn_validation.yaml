@@ -1,0 +1,12 @@
+scripts: "analysis/scripts/pacb_ilmn_validation"
+starting_prg:
+    fasta_ref: "analysis/input_data/ref_genomes/P_falciparum_2015_08/Pfalciparum.genome.fasta.gz"
+    gene_list: "analysis/input_data/gene_lists/gene_list_1.txt"
+    var_regions: "analysis/outputs/starting_prg/gene_list_1/beds/genes.bed"
+    prg: "analysis/outputs/starting_prg/gene_list_1/prg"
+
+kmer_size: 10
+
+sample_tsv: "analysis/input_data/pacb_ilmn_validation/data_accessions.tsv"
+assemblies_dir: "analysis/input_data/pacb_ilmn_validation/pacb_assemblies"
+ilmn_reads_dir: "analysis/input_data/pacb_ilmn_validation/ilmn_reads"

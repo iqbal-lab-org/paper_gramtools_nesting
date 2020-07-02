@@ -1,0 +1,232 @@
+from pathlib import Path
+
+WORKFLOW = 'pacb_ilmn_validation'
+
+configfile: "analysis/configs/common.yaml"
+configfile: f"analysis/configs/{WORKFLOW}.yaml"
+container: config["singularity"]
+
+include: "utils.py"
+
+gene_list = Path(config["starting_prg"]["gene_list"]).stem
+build_dir = Path(f'{config["gram_builds_dir"]}/{gene_list}')
+build_dir.mkdir(exist_ok=True, parents=True)
+
+output_base = f'{config["output_dir"]}/{WORKFLOW}/'
+gene_outputs_dir = Path(f'{output_base}/{gene_list}')
+gene_outputs_dir.mkdir(exist_ok=True, parents=True)
+
+# Bit of trickery with dirs: in rule align_induced_gene_seqs, require rules to produce outputs without '/' in wildcard name,
+# so refer to this array's elements directly
+vcf_outputs_dirs = ["cortex_3d7", "gramtools_genotype", "cortex_pers_ref"]
+cortex_3d7_dir = gene_outputs_dir / vcf_outputs_dirs[0]
+cortex_3d7_dir.mkdir(exist_ok=True)
+gramtools_genotype_dir = gene_outputs_dir / vcf_outputs_dirs[1]
+gramtools_genotype_dir.mkdir(exist_ok=True, parents=True)
+cortex_pers_ref_dir = gene_outputs_dir / vcf_outputs_dirs[2]
+cortex_pers_ref_dir.mkdir(exist_ok=True, parents=True)
+
+
+alignments_outputs_dir = gene_outputs_dir / "alignments"
+alignments_outputs_dir.mkdir(exist_ok=True)
+gene_portions_dir = alignments_outputs_dir / "gene_portions"
+gene_portions_dir.mkdir(exist_ok=True)
+
+bowtie_indexes_dir = Path(f'{output_base}/bowtie_indexes')
+bowtie_indexes_dir.mkdir(exist_ok=True)
+
+excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
+SAMPLES = get_samples(config["sample_tsv"], excluded)
+#SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8', 'KE01'})
+
+rule all:
+	input:
+		expand(f'{alignments_outputs_dir}/{{condition}}_{{sample}}.sam', condition=vcf_outputs_dirs + ['3d7'], sample=SAMPLES),
+
+
+rule index_pacb_assemblies:
+	input:
+		assembly=get_assembly
+	output:
+		expand(f'{bowtie_indexes_dir}/{{sample}}.{{ext}}',ext=bowtie2_idx_extensions, allow_missing=True),
+	params:
+		directory=f'{bowtie_indexes_dir}/{{sample}}',
+	shell:
+		"bowtie2-build {input.assembly[0]} {params.directory}"
+
+rule gram_build:
+	input:
+		prg=config["starting_prg"]["prg"],
+		ref=config["starting_prg"]["fasta_ref"]
+		
+	output:
+		directory(f'{build_dir}/starting_prg_k{config["kmer_size"]}')
+
+	params:
+		k=config["kmer_size"]
+
+	resources:
+		mem_mb=20000
+
+	shell:
+		"""
+		gramtools build --prg {input.prg} --ref {input.ref} --kmer_size {params.k} --gram_dir {output} --force
+		"""
+
+rule cortex_3d7:
+	input:
+		fasta_ref=config["starting_prg"]["fasta_ref"],
+		reads_files=get_reads
+	output:
+		out_vcf=f'{gene_outputs_dir}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz',
+		bcftools_index=f'{cortex_3d7_dir}/{{sample}}.vcf.gz.csi'
+
+	params:
+		cortex_script=f'{config["scripts"]}/{WORKFLOW}/run_cortex.py',
+		cortex_vcf=f'{cortex_3d7_dir}/{{sample}}.vcf'
+
+	resources:
+		mem_mb=15000
+
+	shell:
+		"""
+		python3 {params.cortex_script} {input.fasta_ref} "{input.reads_files}" {params.cortex_vcf}
+		bgzip {params.cortex_vcf}
+		bcftools index {output.out_vcf}
+		"""
+
+rule gramtools_genotype:
+	input:
+		gram_dir=rules.gram_build.output[0],
+		reads_files=get_reads
+
+	output:
+		sample_geno_dir=directory(f'{gramtools_genotype_dir}/{{sample}}'),
+		out_vcf=f'{gene_outputs_dir}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz',
+		bcftools_index=f'{gramtools_genotype_dir}/{{sample}}.vcf.gz.csi',
+
+	threads: 10
+	resources:
+		mem_mb=10000
+
+	shell:
+		"""
+		gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --force
+		cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.out_vcf}
+		bcftools index {output.out_vcf}
+		"""
+
+
+rule cortex_pers_ref:
+	input:
+		sample_geno_dir=f'{gramtools_genotype_dir}/{{sample}}',
+		geno_vcf=rules.gramtools_genotype.output.out_vcf
+
+	output:
+		out_vcf=f'{gene_outputs_dir}/{vcf_outputs_dirs[2]}/{{sample}}.vcf.gz',
+		sample_discov_dir=directory(f'{cortex_pers_ref_dir}/{{sample}}'),
+		bcftools_index=f'{cortex_pers_ref_dir}/{{sample}}.vcf.gz.csi',
+		pers_ref=f'{cortex_pers_ref_dir}/{{sample}}.fa',
+		rebasing_map=f'{cortex_pers_ref_dir}/{{sample}}_rebasing.json',
+
+	params:
+		discov_cortex_vcf=f'{cortex_pers_ref_dir}/{{sample}}.vcf',
+
+	resources:
+		mem_mb=15000
+
+	shell:
+		"""
+		cp {input.sample_geno_dir}/genotype/personalised_reference.fasta {output.pers_ref}
+		gramtools discover -i {input.sample_geno_dir} -o {output.sample_discov_dir} --force
+		cp {output.sample_discov_dir}/cortex.vcf {params.discov_cortex_vcf}
+		bgzip {params.discov_cortex_vcf}
+		bcftools index {output.out_vcf}
+		cp {output.sample_discov_dir}/rebasing_map.json {output.rebasing_map}
+		"""
+
+
+rule align_induced_gene_seqs:
+	input:
+		truth_ref_idx=expand(f'{bowtie_indexes_dir}/{{sample}}.{{ext}}', ext=bowtie2_idx_extensions, allow_missing=True),
+		result_vcf=f'{gene_outputs_dir}/{{condition}}/{{sample}}.vcf.gz',
+		var_regions=config["starting_prg"]["var_regions"],
+		fasta_ref=config["starting_prg"]["fasta_ref"],
+
+	output:
+		alignment_file=f'{alignments_outputs_dir}/{{condition}}_{{sample}}.sam',
+
+	params:
+		gene_portions=f'{gene_portions_dir}/{{condition}}_{{sample}}.fa',
+		clean_vcf=f'{alignments_outputs_dir}/{{condition}}_{{sample}}_cleaned.vcf.gz',
+		idx_prefix=f'{bowtie_indexes_dir}/{{sample}}',
+		# Below are specific to one condition (cortex_pers_ref)
+		condition_dir=f'{gene_outputs_dir}/{{condition}}',
+		shift_coords_script=f'{config["scripts"]}/{WORKFLOW}/shift_to_pers_ref_coords.py',
+		output_bed=f'{alignments_outputs_dir}/{{condition}}_{{sample}}_shifted.bed'
+
+	resources:
+		mem_mb=5000
+
+	shell:
+		"""
+		> {params.gene_portions}
+		used_bed={input.var_regions}
+		used_ref={input.fasta_ref}
+		if [[ {wildcards.condition} == "cortex_pers_ref" ]]; then
+			rebasing_map={params.condition_dir}/{wildcards.sample}_rebasing.json
+			python3 {params.shift_coords_script} {input.var_regions} $rebasing_map {params.output_bed}
+			used_bed={params.output_bed}
+			used_ref={params.condition_dir}/{wildcards.sample}.fa.gz
+			if [[ ! -e $used_ref ]]; then
+				bgzip {params.condition_dir}/{wildcards.sample}.fa	
+			fi
+			samtools faidx $used_ref
+		fi
+		bcftools norm -c x -f $used_ref {input.result_vcf} -Oz > {params.clean_vcf}
+		bcftools index {params.clean_vcf}
+		IFS="\n"; for gene_line in $(cat ${{used_bed}})
+		do
+			IFS="\t"; elems=($gene_line)	
+			adjusted_start=$((${{elems[1]}} + 1))
+			reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
+			gene_name=${{elems[3]}}
+			samtools faidx ${{used_ref}} $reg | bcftools consensus {params.clean_vcf} |
+				sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
+		done
+		rm {params.clean_vcf} {params.clean_vcf}.csi
+
+		bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
+		"""
+
+rule align_3d7_ref_seq:
+	input:
+		truth_ref_idx=expand(f'{bowtie_indexes_dir}/{{sample}}.{{ext}}', ext=bowtie2_idx_extensions, allow_missing=True),
+		var_regions=config["starting_prg"]["var_regions"],
+		fasta_ref=config["starting_prg"]["fasta_ref"],
+
+	output:
+		alignment_file=f'{alignments_outputs_dir}/3d7_{{sample}}.sam',
+
+	params:
+		gene_portions=f'{gene_portions_dir}/3d7_{{sample}}.fa',
+		idx_prefix=f'{bowtie_indexes_dir}/{{sample}}',
+
+	resources:
+		mem_mb=5000
+
+	shell:
+		"""
+		> {params.gene_portions}
+		IFS="\n"; for gene_line in $(cat {input.var_regions})
+		do
+			IFS="\t"; elems=($gene_line)	
+			adjusted_start=$((${{elems[1]}} + 1))
+			reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
+			gene_name=${{elems[3]}}
+			samtools faidx {input.fasta_ref} $reg |
+				sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
+		done
+
+		bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
+		"""
