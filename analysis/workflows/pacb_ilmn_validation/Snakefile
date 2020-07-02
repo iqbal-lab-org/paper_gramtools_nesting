@@ -9,6 +9,7 @@ container: config["container"]
 include: "utils.py"
 include: "../common_utils.py"
 
+GMTOOLS_COMMIT = get_gmtools_commit()
 
 gene_list = Path(config["starting_prg"]["gene_list"]).stem
 

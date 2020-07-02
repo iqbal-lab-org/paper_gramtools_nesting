@@ -1,15 +1,17 @@
 import re
 from pathlib import Path
 
-include: "utils.py"
+WORKFLOW = "make_prgs"
 
 configfile: "analysis/configs/common.yaml"
-configfile: "analysis/configs/starting_prg.yaml"
-container: config["singularity"]
+configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
+container: config["container"]
+
+include: "utils.py"
 
 # Paths
 gene_list = Path(config["genes"]).stem
-output_base = Path(f'{config["output_dir"]}/starting_prg/{gene_list}')
+output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/{gene_list}')
 output_base.mkdir(exist_ok=True, parents=True)
 
 output_bed = output_base / "beds"
@@ -42,7 +44,7 @@ rule make_beds:
 		nonvar_bed = f'{str(output_bed)}/nonvars.bed',
 		full_bed = f'{str(output_bed)}/full.bed',
 	params:
-		extension_script = f'{config["scripts"]}/extend_intervals.py',
+		extension_script = f'{config["scripts"]}/{WORKFLOW}/extend_intervals.py',
 		flank_size = config["flank_size"],
 	shell:
 		"""
@@ -193,7 +195,7 @@ rule concat_prgs:
 	output:
 		f"{str(output_base)}/prg_mn{{max_nest}}_mml{{min_match}}"
 	params:
-		concat_prg_script = f'{config["scripts"]}/concat_prgs.py',
+		concat_prg_script = f'{config["scripts"]}/{WORKFLOW}/concat_prgs.py',
 		var_prg_dir = f'{output_prgs}/mn{{max_nest}}_mml{{min_match}}'
 	resources:
 		mem_mb=5000

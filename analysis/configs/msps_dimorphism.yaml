@@ -1,7 +1,7 @@
 pf3k:
-    bams_filelist: "analysis/input_data/plasmodium/pf3k/bam_list.txt"
-    bams_basedir: "analysis/input_data/plasmodium/pf3k/bams"
+    bams_filelist: "analysis/input_data/pfalciparum/pf3k/bam_list.txt"
+    bams_basedir: "analysis/input_data/pfalciparum/pf3k/bams"
 
-prg: "analysis/input_data/plasmodium/prgs/DBLMSPs/mn5_mml7/prg"
-prg_ref: "analysis/input_data/plasmodium/prgs/DBLMSPs/ref.fa"
-genes_bed: "analysis/input_data/plasmodium/prgs/DBLMSPs/genes_in_prg.bed"
+prg: "analysis/outputs/make_prgs/pf_DBLMSPs/prg_mn5_mml7" # Implies make_prgs workflow has been run on the pf_DBLMSPs gene list
+prg_ref: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta.gz"
+genes_bed: "analysis/input_data/pfalciparum/prgs/DBLMSPs/genes_in_prg.bed"

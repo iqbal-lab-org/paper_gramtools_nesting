@@ -9,6 +9,7 @@ container: config["container"]
 include: "utils.py"
 include: "../common_utils.py"
 
+GMTOOLS_COMMIT = get_gmtools_commit()
 
 #_____Set up output paths______#
 output_base = Path(f"analysis/outputs/{WORKFLOW}/{GMTOOLS_COMMIT}")

@@ -67,7 +67,7 @@ From: ubuntu:latest
 	## make_prg
 	cd ${HOME}
 	git clone https://github.com/rmcolq/make_prg.git
-	cd make_prg && git checkout e84e891a7bd8b8b3dc73e44345fc2750569822fa
+	cd make_prg && git checkout bcd7f7dba42aa29d5fe6a75f9e1c9abd129ae62b
 	python3 setup.py install
 
 	## art_ilmn (Read simulation)
@@ -93,8 +93,8 @@ From: ubuntu:latest
 	mkdir cmake-build-release && cd cmake-build-release
 	cmake .. -DCMAKE_BUILD_TYPE=REL_WITH_ASSERTS
 	make -j 4 encode_prg combine_jvcfs
-	cp ../libgramtools/submods/encode_prg /usr/bin/
-	cp ../libgramtools/submods/combine_jvcfs /usr/bin/
+	cp ../libgramtools/submods/encode_prg.bin /usr/bin/encode_prg
+	cp ../libgramtools/submods/combine_jvcfs.bin /usr/bin/combine_jvcfs
 
 	cd ..
 	pip install .	
