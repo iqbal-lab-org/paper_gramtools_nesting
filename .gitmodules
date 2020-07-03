@@ -1,0 +1,3 @@
+[submodule "writing/paper_repo"]
+	path = writing/paper_repo
+	url = https://github.com/iqbal-lab/paper_gramtools_nesting

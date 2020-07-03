@@ -91,7 +91,7 @@ From: ubuntu:latest
 	cp ../libgramtools/submods/combine_jvcfs.bin /usr/bin/combine_jvcfs
 
 	cd ..
-	pip3 install .	
+	pip3 install .	 # Does not work: bin/ and lib/ do not get copied into the install directory.
 
 
 %environment
