@@ -22,7 +22,7 @@ output_drawn_trees = output_trees / "plots"
 output_tree_splits = output_trees / "splits"
 output_graphs = output_base / "graphs"
 
-mk_output_dirs()
+mk_output_dirs(dir())
 
 genes = get_tree_genes(config["genes_bed"]) # in utils.py
 

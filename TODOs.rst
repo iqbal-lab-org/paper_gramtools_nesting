@@ -4,6 +4,10 @@ make_prgs
 * Support for a bed input. Currently I use a list of genes + a gff3 to produce the bed in rule 'make_beds'
 
 
+pacb_ilmn_validation
+======================
+
+* Plot histograms rather than boxplots of edit distances
 
 msps_dimorphism
 ================
