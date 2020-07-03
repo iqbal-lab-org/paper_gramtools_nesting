@@ -25,8 +25,9 @@ From: ubuntu:latest
 
 	# analysis tools
 
-	## art_ilmn
+	## art_ilmn (read simulation)
 	cd ${HOME}
+	ln -s /usr/lib/x86_64-linux-gnu/libgsl.so /usr/lib/x86_64-linux-gnu/libgsl.so.0
 	wget https://www.niehs.nih.gov/research/resources/assets/docs/artsrcmountrainier2016.06.05linux.tgz
 	tar xvf artsrcmountrainier2016.06.05linux.tgz
 	cp art_src_MountRainier_Linux/art_illumina /usr/bin/
@@ -62,20 +63,13 @@ From: ubuntu:latest
 	cd ${HOME}
 	wget https://github.com/BenLangmead/bowtie2/releases/download/v2.4.1/bowtie2-2.4.1-linux-x86_64.zip
 	unzip bowtie2-2.4.1-linux-x86_64.zip
-	cp bowtie2-2.4.1-linux-x86_64/bowtie* /usr/bin/ && cp .. && rm -r bowtie2-2.4.1-linux-x86_64*
+	cp bowtie2-2.4.1-linux-x86_64/bowtie* /usr/bin/ && rm -r bowtie2-2.4.1-linux-x86_64*
 
 	## make_prg
 	cd ${HOME}
 	git clone https://github.com/rmcolq/make_prg.git
 	cd make_prg && git checkout bcd7f7dba42aa29d5fe6a75f9e1c9abd129ae62b
 	python3 setup.py install
-
-	## art_ilmn (Read simulation)
-	cd ${HOME}
-	wget https://www.niehs.nih.gov/research/resources/assets/docs/artsrcmountrainier2016.06.05linux.tgz
-	tar xvf artsrcmountrainier2016.06.05linux.tgz
-	cp art_src_MountRainier_Linux/art_illumina /usr/bin/
-	rm -r artsrcmountrainier2016.06.05linux.tgz art_src_MountRainier_Linux
 
 
 	/*************/
@@ -85,7 +79,7 @@ From: ubuntu:latest
     #ln -sf /usr/bin/g++-8 /usr/bin/g++ # Default to g++-8
 
 	# gramtools::cortex
-	apt-get install -y python2.7 python2.7-dev r-base
+	apt-get install -y python python-dev r-base
 
 	cd ${HOME}
 	git clone https://github.com/iqbal-lab-org/gramtools
@@ -97,7 +91,7 @@ From: ubuntu:latest
 	cp ../libgramtools/submods/combine_jvcfs.bin /usr/bin/combine_jvcfs
 
 	cd ..
-	pip install .	
+	pip3 install .	
 
 
 %environment

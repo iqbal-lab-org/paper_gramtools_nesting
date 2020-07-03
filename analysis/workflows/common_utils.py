@@ -12,6 +12,9 @@ def get_gmtools_commit():
     )
     GMTOOLS_COMMIT.check_returncode()
     GMTOOLS_COMMIT = GMTOOLS_COMMIT.stdout.strip()
+    if GMTOOLS_COMMIT is None:
+        raise ValueError("There is no gramtools commit")
+    return GMTOOLS_COMMIT
 
 
 def mk_output_dirs():

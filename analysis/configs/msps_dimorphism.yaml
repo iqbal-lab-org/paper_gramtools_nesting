@@ -3,5 +3,6 @@ pf3k:
     bams_basedir: "analysis/input_data/pfalciparum/pf3k/bams"
 
 prg: "analysis/outputs/make_prgs/pf_DBLMSPs/prg_mn5_mml7" # Implies make_prgs workflow has been run on the pf_DBLMSPs gene list
+gene_list_name: "pf_DBLMSPs"
 prg_ref: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta.gz"
-genes_bed: "analysis/input_data/pfalciparum/prgs/DBLMSPs/genes_in_prg.bed"
+genes_bed: "analysis/input_data/pfalciparum/prgs/DBLMSPs/analysis_regions.bed"
