@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 configfile: "analysis/configs/common.yaml"
-configfile: "analysis/configs/nestedness_simulations.yaml"
+configfile: "analysis/configs/nestedness_simulations/nestedness_simulations.yaml"
 container : config["container"]
 
 #_____Set up output paths______#
@@ -19,6 +19,8 @@ for variable in filter(lambda name: name.startswith("output"), dir()):
 
 include: "utils.py"
 include: "../common_utils.py"
+
+GMTOOLS_COMMIT = get_gmtools_commit()
 
 rule all:
 		input:

@@ -1,3 +1,3 @@
 name	nesting	base_path
-DBLMSPs	nested	analysis/nesting_paper/analysis/input_data/plasmodium/prgs/DBLMSPs/mn5_mml7
-DBLMSPs	nonested	analysis/nesting_paper/analysis/input_data/plasmodium/prgs/DBLMSPs/mn1_mml7
+DBLMSPs	nested	analysis/outputs/make_prgs/pf_DBLMSPs/prg_mn5_mml7
+DBLMSPs	nonested	analysis/outputs/make_prgs/pf_DBLMSPs/prg_mn1_mml7
