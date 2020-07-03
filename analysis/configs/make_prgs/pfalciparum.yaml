@@ -2,8 +2,8 @@ genes: "analysis/input_data/make_prgs/gene_lists/pf_DBLMSPs.txt"
 flank_size: 5000
 
 pf_release_3:
-  fasta: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta.gz"
-  fai: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta.gz.fai"
+  fasta: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta"
+  fai: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta"
   gff: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.gff3"
   cortex_vcf_prefix: "analysis/input_data/make_prgs/pf3k_cortex_vcfs"
   cortex_vcf_list: "analysis/input_data/make_prgs/pf3k_cortex_vcfs/vcf_list.txt"
