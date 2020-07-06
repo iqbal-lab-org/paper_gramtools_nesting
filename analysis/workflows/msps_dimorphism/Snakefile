@@ -13,7 +13,7 @@ GMTOOLS_COMMIT = get_gmtools_commit()
 
 #_____Set up output paths______#
 output_base = Path(f"analysis/outputs/{WORKFLOW}/{GMTOOLS_COMMIT}")
-output_gram_build = f'{config["gram_builds_dir"]}/{config["gene_list_name"]}'
+output_gram_build = Path(f'{config["gram_builds_dir"]}/{config["gene_list_name"]}')
 output_gtyping = output_base / "gtyping"
 output_msas = output_base / "msas"
 output_sequences = output_msas / "sequences"

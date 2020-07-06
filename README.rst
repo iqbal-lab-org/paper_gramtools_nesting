@@ -20,6 +20,8 @@ Takes a PRG, truth assemblies from samples and ilmn reads from the same samples.
 
 Truth assemblies and ilmn read sets should be downloaded before running the workflow. They should be placed in analysis/input_data/{dataset}/pacb_ilmn. For eg for pfalciparum I have download scripts in analysis/input_data/pfalciparum/pacb_ilmn/dl_*.sh
 
+NOTE: the reference genome **cannot be gzipped**, it must be plain fasta, for py-cortex-api to run successfully.
+
 pfalciparum
 ````````````
 
