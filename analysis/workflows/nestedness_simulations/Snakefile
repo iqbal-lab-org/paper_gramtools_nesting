@@ -31,15 +31,23 @@ rule all:
 
 rule gram_build:
 	input:
-		get_data_path # function, in utils.py
+		prg=get_prg_path
 	output:
 		f'{output_build}/{{dataset}}_{{nesting}}/prg'
 	params:
+		genome=get_genome_path,
+		coords=get_coords,
 		gram_dir=directory(f'{output_build}/{{dataset}}_{{nesting}}'),
+		prg_converter_script=f'{config["scripts"]}/make_prgs/concat_prgs.py'
 	resources:
 		mem_mb=10000
+	shadow: "shallow"
 	shell:
-		f'gramtools build --gram_dir {{params.gram_dir}} --ref {config["fasta_ref"]} --prg {{input}} --kmer_size {config["k"]} --force'
+		"cp {input.prg} raw_prg;"
+		"echo -e '\t\t\traw_prg' > regions.bed;"
+		"python3 {params.prg_converter_script} . regions.bed ./prg;"
+		"samtools faidx {params.genome} {params.coords} > tmp_ref.fa;"
+		f'gramtools build --gram_dir {{params.gram_dir}} --ref tmp_ref.fa --prg ./prg --kmer_size {config["k"]} --force;'
 
 
 rule simulate_paths:
@@ -101,7 +109,7 @@ rule genotype:
 	output:
 		f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json'
 	params:
-		build_dir=f'{output_build}/k{config["k"]}_{{dataset}}_{{nesting}}',
+		build_dir=f'{output_build}/{{dataset}}_{{nesting}}',
 		output_dir=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}',
 		read_stats_output=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_readstats.json',
 	threads: 10
