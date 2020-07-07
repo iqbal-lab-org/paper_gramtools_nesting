@@ -1,4 +1,5 @@
 datasets : "analysis/configs/nestedness_simulations/datasets.tsv"
+fasta_ref: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta"
 
 k : 10
 

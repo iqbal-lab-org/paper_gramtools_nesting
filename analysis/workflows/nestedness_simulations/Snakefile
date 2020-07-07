@@ -5,22 +5,25 @@ configfile: "analysis/configs/common.yaml"
 configfile: "analysis/configs/nestedness_simulations/nestedness_simulations.yaml"
 container : config["container"]
 
-#_____Set up output paths______#
-output_base = Path("analysis/outputs/nestedness_simulations")
-output_build = output_base / "gram_build"
-output_paths = output_base / "paths"
-output_reads = output_base / "reads"
-output_gtyping = output_base / "genotyping"
-output_eval = output_base / "evaluation"
-output_plots = output_base / "plots"
-
-for variable in filter(lambda name: name.startswith("output"), dir()):
-	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
-
 include: "utils.py"
 include: "../common_utils.py"
 
 GMTOOLS_COMMIT = get_gmtools_commit()
+
+#_____Set up output paths______#
+output_base = Path(f"analysis/outputs/nestedness_simulations")
+output_paths = output_base / "paths"
+output_reads = output_base / "reads"
+
+output_base_commit = output_base / GMTOOLS_COMMIT
+output_build = output_base_commit / "gram_build"
+output_gtyping = output_base_commit / "genotyping"
+output_eval = output_base_commit / "evaluation"
+output_plots = output_base_commit / "plots"
+
+for variable in filter(lambda name: name.startswith("output"), dir()):
+	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
+
 
 rule all:
 		input:
@@ -30,17 +33,16 @@ rule gram_build:
 	input:
 		get_data_path # function, in utils.py
 	output:
-		f'{output_build}/k{config["k"]}_{{dataset}}_{{nesting}}/prg'
+		f'{output_build}/{{dataset}}_{{nesting}}/prg'
 	params:
-		k = config["k"],
-		gram_dir=directory(f'{output_build}/k{config["k"]}_{{dataset}}_{{nesting}}'),
+		gram_dir=directory(f'{output_build}/{{dataset}}_{{nesting}}'),
 	shell:
-		"gramtools build --gram_dir {params.gram_dir} --ref {input}/../ref.fa --prg {input}/prg --kmer_size {params.k} --force"
+		f'gramtools build --gram_dir {{params.gram_dir}} --ref {config["fasta_ref"]} --prg {{input}} --kmer_size {config["k"]} --force'
 
 
 rule simulate_paths:
 	input:
-		expand(f'{output_build}/k{config["k"]}_{{dataset}}_{{nesting}}/prg',nesting=conditions,allow_missing=True)
+		expand(f'{output_build}/{{dataset}}_{{nesting}}/prg',nesting=conditions,allow_missing=True)
 	output:
 		expand(f'{output_paths}/{{dataset}}_{{nesting}}.json',nesting=conditions,allow_missing=True),
 		simu_fasta=f'{output_paths}/{{dataset}}_nonested.fasta',
