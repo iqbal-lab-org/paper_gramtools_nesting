@@ -20,8 +20,8 @@ output_gene_list = Path(f'{output_base}/{gene_list}/{GMTOOLS_COMMIT}')
 
 # Bit of trickery with dirs: in rule align_induced_gene_seqs, require rules to produce outputs without '/' in wildcard name,
 # so refer to this array's elements directly
-vcf_outputs_dirs = ["cortex_3d7", "gramtools_genotype", "cortex_pers_ref"]
-output_cortex_3d7 = output_gene_list / vcf_outputs_dirs[0]
+vcf_outputs_dirs = ["cortex_baseline_ref", "gramtools_genotype", "cortex_pers_ref"]
+output_cortex_baseline_ref = output_gene_list / vcf_outputs_dirs[0]
 output_gramtools_genotype = output_gene_list / vcf_outputs_dirs[1]
 output_cortex_pers_ref = output_gene_list / vcf_outputs_dirs[2]
 
@@ -37,7 +37,7 @@ SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8', 'KE01'})
 
 rule all:
 	input:
-		expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=vcf_outputs_dirs + ['3d7'], sample=SAMPLES),
+		expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=vcf_outputs_dirs + ['baseline_ref'], sample=SAMPLES),
 
 
 rule index_pacb_assemblies:
@@ -69,17 +69,17 @@ rule gram_build:
 		gramtools build --prg {input.prg} --ref {input.ref} --kmer_size {params.k} --gram_dir {output} --force
 		"""
 
-rule cortex_3d7:
+rule cortex_baseline_ref:
 	input:
 		fasta_ref=config["starting_prg"]["fasta_ref"],
 		reads_files=get_reads
 	output:
 		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz',
-		bcftools_index=f'{output_cortex_3d7}/{{sample}}.vcf.gz.csi'
+		bcftools_index=f'{output_cortex_baseline_ref}/{{sample}}.vcf.gz.csi'
 
 	params:
 		cortex_script=f'{config["scripts"]}/{WORKFLOW}/run_cortex.py',
-		cortex_vcf=f'{output_cortex_3d7}/{{sample}}.vcf'
+		cortex_vcf=f'{output_cortex_baseline_ref}/{{sample}}.vcf'
 
 	resources:
 		mem_mb=15000
@@ -195,17 +195,17 @@ rule align_induced_gene_seqs:
 		bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
 		"""
 
-rule align_3d7_ref_seq:
+rule align_baseline_ref_seq:
 	input:
 		truth_ref_idx=expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}', ext=bowtie2_idx_extensions, allow_missing=True),
 		var_regions=config["starting_prg"]["var_regions"],
 		fasta_ref=config["starting_prg"]["fasta_ref"],
 
 	output:
-		alignment_file=f'{output_alignments}/3d7_{{sample}}.sam',
+		alignment_file=f'{output_alignments}/baseline_ref_{{sample}}.sam',
 
 	params:
-		gene_portions=f'{output_gene_portions}/3d7_{{sample}}.fa',
+		gene_portions=f'{output_gene_portions}/baseline_ref_{{sample}}.fa',
 		idx_prefix=f'{output_bowtie_indexes}/{{sample}}',
 
 	resources:
