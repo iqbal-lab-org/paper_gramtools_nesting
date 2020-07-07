@@ -36,6 +36,8 @@ rule gram_build:
 		f'{output_build}/{{dataset}}_{{nesting}}/prg'
 	params:
 		gram_dir=directory(f'{output_build}/{{dataset}}_{{nesting}}'),
+	resources:
+		mem_mb=10000
 	shell:
 		f'gramtools build --gram_dir {{params.gram_dir}} --ref {config["fasta_ref"]} --prg {{input}} --kmer_size {config["k"]} --force'
 
@@ -97,11 +99,14 @@ rule genotype:
 	input:
 		f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq'
 	output:
-		f'{output_gtyping}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json'
+		f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json'
 	params:
 		build_dir=f'{output_build}/k{config["k"]}_{{dataset}}_{{nesting}}',
-		output_dir=f'{output_gtyping}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}',
-		read_stats_output=f'{output_gtyping}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_readstats.json',
+		output_dir=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}',
+		read_stats_output=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_readstats.json',
+	threads: 10
+	resources:
+		mem_mb=10000
 	shell:
 		"mkdir -p {params.output_dir};"
 		"gramtools genotype -i {params.build_dir} -o {params.output_dir}"
@@ -111,10 +116,10 @@ rule genotype:
 
 rule evaluate:
 	input:
-		res_json=f'{output_gtyping}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json',
+		res_json=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json',
 		truth_json=f'{output_paths}/{{dataset}}_{{nesting}}.json',
 	output:
-		f'{output_eval}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv'
+		f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv'
 	params:
 		eval_script=f'{config["scripts"]}/nocond_simulations/evaluate.py'
 	shell:
@@ -123,7 +128,7 @@ rule evaluate:
 
 def aggregate_simu_paths(wildcards):
 	checkpoint_output = checkpoints.split_multifasta_paths.get(**wildcards).output.paths_dir
-	res = expand(f'{output_eval}/{GMTOOLS_COMMIT}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv', 
+	res = expand(f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv', 
 			dataset = datasets,
 			err = config["simu_read_params"]["err_scaling"], cov = config["simu_read_params"]["fcov"],
 			nesting = conditions,
@@ -135,7 +140,7 @@ rule aggregate:
 	input:
 		aggregate_simu_paths
 	output:
-		f'{output_eval}/{GMTOOLS_COMMIT}/all.tsv'
+		f'{output_eval}/all.tsv'
 	params:
 		eval_script=f'{config["scripts"]}/nocond_simulations/evaluate.py'
 	shell:
@@ -147,9 +152,9 @@ rule plot:
 		to_eval=rules.aggregate.output,
 		nested_json=f'{output_paths}/{list(datasets)[0]}_nested.json'
 	output:
-		f'{output_plots}/{GMTOOLS_COMMIT}/precision_recall.pdf'
+		f'{output_plots}/precision_recall.pdf'
 	params:
 		plot_script=f'{config["scripts"]}/nestedness_simulations/plot.R',
-		output_dir=f'{output_plots}/{GMTOOLS_COMMIT}'
+		output_dir=f'{output_plots}'
 	shell:
 		"mkdir -p {params.output_dir} && Rscript {params.plot_script} {input.to_eval} {params.output_dir} {input.nested_json}"
