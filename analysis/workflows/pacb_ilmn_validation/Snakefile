@@ -29,6 +29,8 @@ output_alignments = output_gene_list / f'alignments_{Path(config["starting_prg"]
 output_gene_portions = output_alignments / "gene_portions"
 output_bowtie_indexes = Path(f'{output_base}/bowtie_indexes')
 
+output_plots = Path(f'{output_gene_list}/plots')
+
 mk_output_dirs(dir())
 
 excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
@@ -37,7 +39,8 @@ SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8', 'KE01'})
 
 rule all:
 	input:
-		expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=vcf_outputs_dirs + ['baseline_ref'], sample=SAMPLES),
+		f'{output_plots}/stats.tsv',
+		f'{output_plots}/NM.pdf',
 
 
 rule index_pacb_assemblies:
@@ -226,3 +229,17 @@ rule align_baseline_ref_seq:
 
 		bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
 		"""
+
+rule process_and_plot_alignments:
+	input:
+		alignments=expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=vcf_outputs_dirs + ['baseline_ref'], sample=SAMPLES),
+		var_regions=config["starting_prg"]["var_regions"],
+	output:
+		f'{output_plots}/stats.tsv',
+		f'{output_plots}/NM.pdf',
+	params:
+		processing_script=f'{config["scripts"]}/{WORKFLOW}/process_alignments.py'
+	shell:
+		f"python3 {{params.processing_script}} {output_alignments} {output_plots} {{input.var_regions}}"
+
+	
