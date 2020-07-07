@@ -27,7 +27,7 @@ for variable in filter(lambda name: name.startswith("output"), dir()):
 
 rule all:
 		input:
-			f'{output_plots}/{GMTOOLS_COMMIT}/precision_recall.pdf'
+			f'{output_plots}/precision_recall.pdf'
 
 rule gram_build:
 	input:

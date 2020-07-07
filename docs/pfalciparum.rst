@@ -22,6 +22,8 @@ PACB/ILMN pairs
 * Corresp table between ILMN reads sample names and PACB assembled genome sample names. ENA accessions can be found in this paper: `Long read assemblies of geographically dispersed Plasmodium
 falciparum isolates reveal highly structured subtelomeres`
 
+* The data is downloaded via analysis/input_data/pfalciparum/pacb_ilmn/dl_*.sh scripts. Note I subsampled the reads for PfIT to 50% after dl using `seqtk` as it has > 2x more reads than others.
+
 read sets
 ``````````
 
