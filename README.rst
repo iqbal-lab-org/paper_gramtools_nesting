@@ -51,6 +51,18 @@ nestedness_simulations
 This is to simulate paths through a nested (resp. non-nested prg), thread them through a non-nested (resp. nested) prg,
 and compare performance between the two conditions.
 
+I manually spotted a site which has striking coverage differences between nested and no nested: site index 579 in nested DBLMSP2, which corresponds to site index 267 in no nested DBLMSP2.
+
+Find index from POS:
+```jq '.Sites[] | .POS' gtyped.json | awk '{if ($1==my_pos){print NR-1}}' ```
+
+Find corresponding site given REF sequence of site allele: 
+``` jq '.Sites[] | select(.ALS[] | contains("my_allele"))' gtyped.json```
+
+TODOs:
+* Understand why coverage at base level site is ~77 when fold cov is 40 in simulations (it is also in the nested sites)
+* Make a figure with the GC distrib PRG-wide and a dotgraph of the nested PRG site 579 for DBLMSP2, explaining how we get i)better GT CONF in nested and ii)how we get indiv SNP call coverage/conf. For i), report the next best allele at genotyping time and its coverage for both nested and non-nested.
+
 Plasmodium DBLMSPs
 ```````````````````
 

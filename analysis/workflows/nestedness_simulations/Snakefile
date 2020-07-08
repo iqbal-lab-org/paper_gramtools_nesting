@@ -52,7 +52,7 @@ rule gram_build:
 
 rule simulate_paths:
 	input:
-		expand(f'{output_build}/{{dataset}}_{{nesting}}/prg',nesting=conditions,allow_missing=True)
+		get_prg_paths
 	output:
 		expand(f'{output_paths}/{{dataset}}_{{nesting}}.json',nesting=conditions,allow_missing=True),
 		simu_fasta=f'{output_paths}/{{dataset}}_nonested.fasta',
@@ -105,22 +105,21 @@ rule simulate_reads:
 
 rule genotype:
 	input:
-		f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq'
+		reads=f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq',
+		gram_build=f'{output_build}/{{dataset}}_{{nesting}}/prg'
 	output:
 		f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json'
 	params:
-		build_dir=f'{output_build}/{{dataset}}_{{nesting}}',
 		output_dir=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}',
-		read_stats_output=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_readstats.json',
+		build_dir=f'{output_build}/{{dataset}}_{{nesting}}'
 	threads: 10
 	resources:
 		mem_mb=10000
 	shell:
 		"mkdir -p {params.output_dir};"
 		"gramtools genotype -i {params.build_dir} -o {params.output_dir}"
-		" --reads {input} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --force;"
-		"cp {params.output_dir}/genotype/genotyped.json {output}; cp {params.output_dir}/read_stats.json {params.read_stats_output};"
-		"rm -r {params.output_dir};"
+		" --reads {input.reads} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --force;"
+		"mv {params.output_dir}/genotype/genotyped.json {output}"
 
 rule evaluate:
 	input:

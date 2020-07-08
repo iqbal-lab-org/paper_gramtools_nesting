@@ -21,6 +21,13 @@ def get_prg_path(wildcards):
     return dataset_access[f"{wildcards.dataset}_{wildcards.nesting}"]["prg"]
 
 
+def get_prg_paths(wildcards):
+    res = list()
+    for condition in conditions:
+        res.append(dataset_access[f"{wildcards.dataset}_{condition}"]["prg"])
+    return res
+
+
 def get_genome_path(wildcards):
     return dataset_access[f"{wildcards.dataset}_{wildcards.nesting}"]["genome_ref"]
 
