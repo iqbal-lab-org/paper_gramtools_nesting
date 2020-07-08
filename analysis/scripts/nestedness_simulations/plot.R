@@ -7,7 +7,7 @@ library(rjson)
 p <- arg_parser("Plot genotyping performance")
 p <- add_argument(p, "input_tsv", help="")
 p <- add_argument(p, "output_dir", help="")
-p <- add_argument(p, "nested_json", help="")
+p <- add_argument(p, "dataset_name", help="")
 
 #______Classifying calls____#
 get_classif <- function(has_call, is_correct){
@@ -49,6 +49,7 @@ plot_prec_recall <- function(data, title, argv, prg_name, gmtools_commit){
   prec_recall <- ggplot(total, aes(metric,score)) + geom_bar(aes(fill=nesting), stat="identity",position="dodge")
   prec_recall <- prec_recall + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both) + labs(title = plot_title)
   
+  title<-paste(argv$dataset_name,title,sep="_")
   ggsave(file.path(argv$output_dir,title),width = 10, height = 8, plot=prec_recall)
 }
 
@@ -60,6 +61,8 @@ plot_GC <- function(data, title, argv, prg_name, gmtools_commit){
   plot_title <- sprintf("dataset: %s \ngenotype confidence x correctness, gmtools_commit: %s", prg_name, gmtools_commit)
   GC_boxplot <- ggplot(correctness, aes(classif, log_GC)) + geom_boxplot(aes(fill=nesting)) + labs(title=plot_title)
   GC_boxplot <- GC_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
+  
+  title<-paste(argv$dataset_name,title,sep="_")
   ggsave(file.path(argv$output_dir,title),width = 8, height = 6, plot=GC_boxplot)
 }
 
@@ -71,6 +74,8 @@ plot_GCP <- function(data, title, argv, prg_name, gmtools_commit){
   plot_title <- sprintf("dataset: %s\ngenotype confidence percentile  x correctness, gmtools_commit: %s", prg_name, gmtools_commit)
   GCP_boxplot <- ggplot(correctness, aes(classif, GCP)) + geom_boxplot(aes(fill=nesting)) + labs(title=plot_title)
   GCP_boxplot <- GCP_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
+  
+  title<-paste(argv$dataset_name,title,sep="_")
   ggsave(file.path(argv$output_dir,title),width = 8, height = 6, plot=GCP_boxplot)
 }
 
@@ -87,9 +92,8 @@ print_prec_recall <- function(data){
 argv <- parse_args(p)
 data <- read_tsv(argv$input_tsv)
 gmtools_commit <- basename(argv$output_dir)
-nested_json <- fromJSON(file=argv$nested_json)
+prg_name = argv$dataset_name
 
-prg_name = "DBLMSPs"
 data <- data %>% filter(prg == prg_name) 
 
 # Add classification
