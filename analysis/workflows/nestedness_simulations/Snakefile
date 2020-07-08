@@ -118,7 +118,7 @@ rule genotype:
 	shell:
 		"mkdir -p {params.output_dir};"
 		"gramtools genotype -i {params.build_dir} -o {params.output_dir}"
-		" --reads {input.reads} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --force;"
+		" --reads {input.reads} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --force --debug;"
 		"mv {params.output_dir}/genotype/genotyped.json {output}"
 
 rule evaluate:
