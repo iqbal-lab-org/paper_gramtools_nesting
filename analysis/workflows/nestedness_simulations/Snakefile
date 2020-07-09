@@ -161,6 +161,6 @@ rule plot:
 		f'{output_plots}/{{dataset}}_precision_recall.pdf'
 	params:
 		plot_script=f'{config["scripts"]}/nestedness_simulations/plot.R',
-		output_dir=f'{output_plots}'
 	shell:
-		"mkdir -p {params.output_dir} && Rscript {params.plot_script} {input.to_eval} {params.output_dir} {wildcards.dataset}"
+		f"mkdir -p {output_plots} && Rscript {{params.plot_script}} {{input.to_eval}} "
+		f"{output_plots} {{wildcards.dataset}} {GMTOOLS_COMMIT}"
