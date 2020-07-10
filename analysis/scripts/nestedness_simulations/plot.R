@@ -45,7 +45,8 @@ plot_prec_recall <- function(data, title, argv, prg_name, gmtools_commit, facete
   total <- rbind(recalls, precisions)
   avg_recall = get_recall(data$classif)
   avg_precision = get_precision(data$classif)
-  plot_title <- sprintf("dataset: %s, gramtools_commit: %s", prg_name, gmtools_commit)
+  #plot_title <- sprintf("dataset: %s, gramtools_commit: %s", prg_name, gmtools_commit)
+  plot_title <- ""
   plot_subtitle <-sprintf("average recall=%.3f average precision=%.3f", avg_recall,avg_precision)
   
   prec_recall <- ggplot(total, aes(metric,score)) + geom_bar(aes(fill=nesting), stat="identity",position="dodge") + 
@@ -54,7 +55,7 @@ plot_prec_recall <- function(data, title, argv, prg_name, gmtools_commit, facete
     prec_recall <- prec_recall + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
     title<-paste(argv$dataset_name,title,sep="_")
   }
-  ggsave(file.path(argv$output_dir,title),width = 10, height = 8, plot=prec_recall)
+  ggsave(file.path(argv$output_dir,title),width = 8, height = 6, plot=prec_recall)
 }
 
 # Plot correctness vs metric distributions
@@ -63,7 +64,8 @@ plot_GC <- function(data, title, argv, prg_name, gmtools_commit, faceted = TRUE,
   if (log_scale)
     correctness <- correctness %>% mutate(GC = log(GC))
   
-  plot_title <- sprintf("dataset: %s, gramtools_commit: %s", prg_name, gmtools_commit)
+  #plot_title <- sprintf("dataset: %s, gramtools_commit: %s", prg_name, gmtools_commit)
+  plot_title <- ""
   GC_boxplot <- ggplot(correctness, aes(classif, GC)) + geom_boxplot(aes(fill=nesting)) + 
     labs(title=plot_title) + xlab("Call classification") + ylab("Genotype confidence")
   if (faceted){
@@ -79,7 +81,8 @@ plot_GCP <- function(data, title, argv, prg_name, gmtools_commit, faceted = TRUE
   correctness <- data %>% filter(classif == "TP" | classif == "FP")
   correctness <- correctness %>% mutate(log_GC = log(GC))
   
-  plot_title <- sprintf("dataset: %s\ngenotype confidence percentile  x correctness, gramtools_commit: %s", prg_name, gmtools_commit)
+  #plot_title <- sprintf("dataset: %s\ngenotype confidence percentile  x correctness, gramtools_commit: %s", prg_name, gmtools_commit)
+  plot_title <- ""
   GCP_boxplot <- ggplot(correctness, aes(classif, GCP)) + geom_boxplot(aes(fill=nesting)) + labs(title=plot_title)
   if (faceted)
     GCP_boxplot <- GCP_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)

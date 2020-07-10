@@ -22,6 +22,7 @@ Truth assemblies and ilmn read sets should be downloaded before running the work
 
 NOTE: the reference genome **cannot be gzipped**, it must be plain fasta, for py-cortex-api to run successfully.
 
+
 pfalciparum
 ````````````
 
@@ -119,6 +120,9 @@ Requirements for running
 Steps for running
 ```````````````````
 * Requires singu container image in container/built. Can be built for example running `sudo singularity build container/built/singu.sif container/singu_def.def`. 
+  CAVEATS [TODOs]:
+    * gramtools building is poorly supported. Also, if you want to upgrade version of gramtools in container, fetch/merge and rebuild gramtools from the container, can't just copy a new binary into the container, otherwise get shared library (hts) linking error.
+    * package in requirements.txt not installed in def file yet, but needed for rules that plot notably
 
 * Current working directory when running any workflow should be the git top-level directory(where this file is)
 

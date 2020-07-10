@@ -16,6 +16,7 @@ prg construction
 PACB/ILMN pairs
 ````````````````
 * PACB assembled genomes: ftp://ftp.sanger.ac.uk/pub/project/pathogens/Plasmodium/falciparum/PF3K/ReferenceGenomes_Version1/
+  Annotation files are also available, under Isolates/.
  --> What is Fort Lauderdale data usage policy?
 
 
