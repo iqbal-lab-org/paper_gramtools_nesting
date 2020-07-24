@@ -34,8 +34,8 @@ output_plots = Path(f'{output_gene_list}/plots')
 mk_output_dirs(dir())
 
 excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
-#SAMPLES = get_samples(config["sample_tsv"], excluded)
-SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8', 'KE01'})
+SAMPLES = get_samples(config["sample_tsv"], excluded)
+#SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8', 'KE01'})
 
 rule all:
 	input:
@@ -59,17 +59,18 @@ rule gram_build:
 		ref=config["starting_prg"]["fasta_ref"]
 		
 	output:
-		directory(output_gram_build)
+		f'{output_gram_build}/cov_graph',
 
 	params:
-		k=config["kmer_size"]
+		k=config["kmer_size"],
+		gram_dir=output_gram_build,
 
 	resources:
 		mem_mb=20000
 
 	shell:
 		"""
-		gramtools build --prg {input.prg} --ref {input.ref} --kmer_size {params.k} --gram_dir {output} --force
+		gramtools build --prg {input.prg} --ref {input.ref} --kmer_size {params.k} --gram_dir {params.gram_dir} --force
 		"""
 
 rule cortex_baseline_ref:
