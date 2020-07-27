@@ -111,14 +111,22 @@ This is to analyse dimorphisms in DBLMSP1 and DBLMSP2 from pf3k genotyped sample
 Running on cluster
 ====================
 
+Warning
+--------
+
+The workflows are reproducible so as to support transparency of the paper results. To this effect they are meant to be run in a cluster environment and with a singularity container encapsulating the dependencies. 
+
+This is good once all tools and versions are finalised. While working on the paper, it is not convenient as you have to rebuild and transfer the whole image if anything changes (eg one line in gramtools). For development, it is best therefore to work with a python `venv` at top-level. Then `pip install -r requirements`. Then locate gramtools on cluster, cmake/make it, and `pip install -e` it from inside the `venv`. And in the workflows, comment out `container:` line. All tools must be available on cluster.
+
+
 Requirements for running
-``````````````````````````
+--------------------------
 
 * Snakemake==v5.14.0
 * Singularity>=v3.4.0-1
 
 Steps for running
-```````````````````
+-------------------
 * Requires singu container image in container/built. Can be built for example running `sudo singularity build container/built/singu.sif container/singu_def.def`. 
   CAVEATS [TODOs]:
     * gramtools building is poorly supported. Also, if you want to upgrade version of gramtools in container, fetch/merge and rebuild gramtools from the container, can't just copy a new binary into the container, otherwise get shared library (hts) linking error.
