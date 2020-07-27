@@ -6,10 +6,10 @@ import sys
 from csv import reader as csv_reader
 from pathlib import Path
 
-from gramtools.commands.discover.seq_region_map import (
-        SearchableSeqRegionsMap, 
-        BisectTarget,
-        Chrom
+from gramtools.commands.genotype.seq_region_map import (
+    SearchableSeqRegionsMap,
+    BisectTarget,
+    Chrom,
 )
 
 
@@ -19,6 +19,7 @@ def translate_pos(chrom: Chrom, pos: int, searcher: SearchableSeqRegionsMap) -> 
     base_ref_offset = pos - region.base_ref_start
     translation = region.pers_ref_start + base_ref_offset
     return translation
+
 
 def usage():
     print(f"{sys.argv[0]} input.bed rebasing_map.json output.bed")
@@ -43,13 +44,16 @@ if __name__ == "__main__":
         reader = csv_reader(bed_in, delimiter="\t")
         for line in reader:
             chrom = line[0]
-            start_pos = int(line[1]) - 1 # Bed start is 0-based, SeqRegion coords are 1-based
+            start_pos = (
+                int(line[1]) - 1
+            )  # Bed start is 0-based, SeqRegion coords are 1-based
             end_pos = int(line[2])
 
             translated_start_pos = translate_pos(chrom, start_pos, searcher)
-            translated_start_pos = str(translated_start_pos -1)
+            translated_start_pos = str(translated_start_pos - 1)
             translated_end_pos = translate_pos(chrom, end_pos, searcher).__str__()
 
-            bed_out.write("\t".join([chrom, translated_start_pos, translated_end_pos] + line[3:]) + "\n")
-            
-
+            bed_out.write(
+                "\t".join([chrom, translated_start_pos, translated_end_pos] + line[3:])
+                + "\n"
+            )

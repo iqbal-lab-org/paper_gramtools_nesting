@@ -20,10 +20,11 @@ output_gene_list = Path(f'{output_base}/{gene_list}/{GMTOOLS_COMMIT}')
 
 # Bit of trickery with dirs: in rule align_induced_gene_seqs, require rules to produce outputs without '/' in wildcard name,
 # so refer to this array's elements directly
-vcf_outputs_dirs = ["cortex_baseline_ref", "gramtools_genotype", "cortex_pers_ref"]
+vcf_outputs_dirs = ["cortex_baseline_ref", "gramtools_genotype", "cortex_pers_ref", "samtools_pers_ref"]
 output_cortex_baseline_ref = output_gene_list / vcf_outputs_dirs[0]
 output_gramtools_genotype = output_gene_list / vcf_outputs_dirs[1]
 output_cortex_pers_ref = output_gene_list / vcf_outputs_dirs[2]
+output_samtools_pers_ref = output_gene_list / vcf_outputs_dirs[3]
 
 output_alignments = output_gene_list / f'alignments_{Path(config["starting_prg"]["var_regions"]).stem}'
 output_gene_portions = output_alignments / "gene_portions"
@@ -34,8 +35,8 @@ output_plots = Path(f'{output_gene_list}/plots')
 mk_output_dirs(dir())
 
 excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
-SAMPLES = get_samples(config["sample_tsv"], excluded)
-#SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8', 'KE01'})
+#SAMPLES = get_samples(config["sample_tsv"], excluded)
+SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8'})
 
 rule all:
 	input:
@@ -97,13 +98,16 @@ rule cortex_baseline_ref:
 
 rule gramtools_genotype:
 	input:
-		gram_dir=rules.gram_build.output[0],
+		gram_build_completed=rules.gram_build.output,
+		gram_dir=f'{Path(rules.gram_build.output[0]).parent}',
 		reads_files=get_reads
 
 	output:
 		sample_geno_dir=directory(f'{output_gramtools_genotype}/{{sample}}'),
 		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz',
 		bcftools_index=f'{output_gramtools_genotype}/{{sample}}.vcf.gz.csi',
+		rebasing_map=f'{output_gramtools_genotype}/{{sample}}/genotype/rebasing_map.json',
+		pers_ref=f'{output_gramtools_genotype}/{{sample}}/genotype/personalised_reference.fasta',
 
 	threads: 10
 	resources:
@@ -126,8 +130,6 @@ rule cortex_pers_ref:
 		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[2]}/{{sample}}.vcf.gz',
 		sample_discov_dir=directory(f'{output_cortex_pers_ref}/{{sample}}'),
 		bcftools_index=f'{output_cortex_pers_ref}/{{sample}}.vcf.gz.csi',
-		pers_ref=f'{output_cortex_pers_ref}/{{sample}}.fa',
-		rebasing_map=f'{output_cortex_pers_ref}/{{sample}}_rebasing.json',
 
 	params:
 		discov_cortex_vcf=f'{output_cortex_pers_ref}/{{sample}}.vcf',
@@ -137,12 +139,31 @@ rule cortex_pers_ref:
 
 	shell:
 		"""
-		cp {input.sample_geno_dir}/genotype/personalised_reference.fasta {output.pers_ref}
 		gramtools discover -i {input.sample_geno_dir} -o {output.sample_discov_dir} --force
 		cp {output.sample_discov_dir}/cortex.vcf {params.discov_cortex_vcf}
 		bgzip {params.discov_cortex_vcf}
 		bcftools index {output.out_vcf}
-		cp {output.sample_discov_dir}/rebasing_map.json {output.rebasing_map}
+		"""
+
+rule samtools_pers_ref:
+	input:
+		reads_files=get_reads,
+		pers_ref=rules.gramtools_genotype.output.pers_ref,
+
+	output:
+		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[3]}/{{sample}}.vcf.gz',
+		bcftools_index=f'{output_samtools_pers_ref}/{{sample}}.vcf.gz.csi',
+	threads: 10
+	resources:
+		mem_mb=10000
+	shell:
+		"""
+		bwa index {input.pers_ref}
+		bwa mem -t {threads} {input.pers_ref} {input.reads_files} -o mapped.sam
+		samtools sort -o mapped.bam -O BAM mapped.sam
+		samtools index mapped.bam
+		bcftools mpileup -f {input.pers_ref} mapped.bam | bcftools call -O z -o {output.out_vcf} -vm --ploidy 1
+		bcftools index {output.out_vcf}
 		"""
 
 
@@ -160,8 +181,7 @@ rule align_induced_gene_seqs:
 		gene_portions=f'{output_gene_portions}/{{condition}}_{{sample}}.fa',
 		clean_vcf=f'{output_alignments}/{{condition}}_{{sample}}_cleaned.vcf.gz',
 		idx_prefix=f'{output_bowtie_indexes}/{{sample}}',
-		# Below are specific to one condition (cortex_pers_ref)
-		condition_dir=f'{output_gene_list}/{{condition}}',
+		# Below are specific to certain conditions
 		shift_coords_script=f'{config["scripts"]}/{WORKFLOW}/shift_to_pers_ref_coords.py',
 		output_bed=f'{output_alignments}/{{condition}}_{{sample}}_shifted.bed'
 
@@ -173,13 +193,19 @@ rule align_induced_gene_seqs:
 		> {params.gene_portions}
 		used_bed={input.var_regions}
 		used_ref={input.fasta_ref}
-		if [[ {wildcards.condition} == "cortex_pers_ref" ]]; then
-			rebasing_map={params.condition_dir}/{wildcards.sample}_rebasing.json
-			python3 {params.shift_coords_script} {input.var_regions} $rebasing_map {params.output_bed}
-			used_bed={params.output_bed}
-			used_ref={params.condition_dir}/{wildcards.sample}.fa.gz
-			if [[ ! -e $used_ref ]]; then
-				bgzip {params.condition_dir}/{wildcards.sample}.fa	
+		if [[ {wildcards.condition} =~ ".+_pers_ref" ]]; then
+		"""
+		f"""
+			rebasing_map='{output_gramtools_genotype}/{{wildcards.sample}}/genotype/rebasing_map.json'
+			python3 {{params.shift_coords_script}} {{input.var_regions}} $rebasing_map {{params.output_bed}}
+			used_bed={{params.output_bed}}
+		"""
+		f"""
+			used_ref={output_gramtools_genotype}/{{wildcards.sample}}/personalised_reference.fa
+		"""
+		"""
+			if [[ ! -e ${{used_ref.gz}} ]]; then
+				bgzip $used_ref
 			fi
 			samtools faidx $used_ref
 		fi
