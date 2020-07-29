@@ -153,6 +153,7 @@ rule samtools_pers_ref:
 	output:
 		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[3]}/{{sample}}.vcf.gz',
 		bcftools_index=f'{output_samtools_pers_ref}/{{sample}}.vcf.gz.csi',
+	shadow: "shallow"
 	threads: 10
 	resources:
 		mem_mb=10000
@@ -164,6 +165,7 @@ rule samtools_pers_ref:
 		samtools index mapped.bam
 		bcftools mpileup -f {input.pers_ref} mapped.bam | bcftools call -O z -o {output.out_vcf} -vm --ploidy 1
 		bcftools index {output.out_vcf}
+		rm {input.pers_ref}.*
 		"""
 
 
@@ -193,7 +195,7 @@ rule align_induced_gene_seqs:
 		> {params.gene_portions}
 		used_bed={input.var_regions}
 		used_ref={input.fasta_ref}
-		if [[ {wildcards.condition} =~ ".+_pers_ref" ]]; then
+		if [[ {wildcards.condition} =~ .+_pers_ref ]]; then
 		"""
 		f"""
 			rebasing_map='{output_gramtools_genotype}/{{wildcards.sample}}/genotype/rebasing_map.json'
@@ -201,12 +203,9 @@ rule align_induced_gene_seqs:
 			used_bed={{params.output_bed}}
 		"""
 		f"""
-			used_ref={output_gramtools_genotype}/{{wildcards.sample}}/personalised_reference.fa
+			used_ref={output_gramtools_genotype}/{{wildcards.sample}}/genotype/personalised_reference.fasta
 		"""
 		"""
-			if [[ ! -e ${{used_ref.gz}} ]]; then
-				bgzip $used_ref
-			fi
 			samtools faidx $used_ref
 		fi
 		bcftools norm -c x -f $used_ref {input.result_vcf} -Oz > {params.clean_vcf}
