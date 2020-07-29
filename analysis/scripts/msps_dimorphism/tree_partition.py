@@ -1,8 +1,8 @@
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, NamedTuple
 
-from ete3 import Tree
+from ete3 import Tree, TreeNode, TreeStyle, NodeStyle
 
 
 def usage(msg: str = ""):
@@ -14,12 +14,17 @@ def usage(msg: str = ""):
     exit(1)
 
 
-Nodes = List[str]
+NodeNames = List[str]
 
 
-def get_partition(tree: Tree) -> List[Nodes]:
+class PartitionResult(NamedTuple):
+    groups: List[NodeNames]
+    split_node: TreeNode
+
+
+def get_partition(tree: Tree) -> PartitionResult:
     cur_node = tree
-    result = list()
+    groups = list()
     while True:
         no_leaf_children = [child for child in cur_node.children if not child.is_leaf()]
         if len(no_leaf_children) == 1:
@@ -43,9 +48,28 @@ def get_partition(tree: Tree) -> List[Nodes]:
                     its_nodes = [
                         node.name for node in subtree.traverse() if node.is_leaf()
                     ]
-                    result.append(its_nodes)
+                    groups.append(its_nodes)
                 break
-    return result
+    return PartitionResult(groups, cur_node)
+
+
+def draw_tree(root: TreeNode, split_node: TreeNode, outpath: Path):
+    ts = TreeStyle()
+    ts.mode = "c"
+    # ts.show_leaf_name = False
+
+    for n in root.traverse():
+        if n == split_node:
+            n.set_style(NodeStyle(fgcolor="red", size=100))
+            subtree_colours = ["blue", "green", "purple"]
+            for i, subtree in enumerate(n.children):
+                for child_node in subtree.traverse():
+                    child_node.set_style(NodeStyle(fgcolor=subtree_colours[i], size=20))
+            break
+        else:
+            n.set_style(NodeStyle(fgcolor="black", size=0))
+
+    root.render(str(outpath), w=180, units="mm", tree_style=ts)
 
 
 def main():
@@ -56,17 +80,19 @@ def main():
     if not input_file.exists():
         usage(f"{input_file} not found")
 
-    output_file = Path(sys.argv[2]).resolve()
-    if not output_file.parent.exists():
-        output_file.parent.mkdir(parent=True)
+    output_prefix = Path(sys.argv[2]).resolve()
+    if not output_prefix.parent.exists():
+        output_prefix.parent.mkdir(parent=True)
 
     tree = Tree(str(input_file))
     partition = get_partition(tree)
-    print(f"Found partition of sizes {[len(l) for l in partition]}")
+    print(f"Found partition of sizes {[len(l) for l in partition.groups]}")
 
-    with output_file.open("w") as fout:
-        for l in partition:
+    with Path(f"{output_prefix}.basal_split").open("w") as fout:
+        for l in partition.groups:
             fout.write("\t".join(l) + "\n")
+
+    draw_tree(tree, partition.split_node, Path(f"{output_prefix}.pdf"))
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ argv <- parse_args(p)
 
 require(ape)
 require(ggtree)
+require(ggplot2)
 
 input_tree <- read.tree(argv$phylo_tree)
 display <- ggtree(input_tree) + ggtitle(paste("Tree: ", basename(argv$phylo_tree), "\n",argv$metadata))

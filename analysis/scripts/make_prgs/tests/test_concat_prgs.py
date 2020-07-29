@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from starting_prg.concat_prgs import (
+from make_prgs.concat_prgs import (
     load_prg_names,
     get_file_names,
     ENDIANNESS,

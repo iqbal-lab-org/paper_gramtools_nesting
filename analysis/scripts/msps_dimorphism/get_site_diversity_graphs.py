@@ -1,7 +1,6 @@
-from typing import Union, List, Tuple, NamedTuple, Optional, Dict
+from typing import Union, List, Optional, Dict
 import sys
 from pathlib import Path
-import re
 import json
 from math import log
 from bisect import bisect_right
@@ -11,38 +10,17 @@ from itertools import combinations
 import click
 from igraph import Graph
 
-region_matcher = re.compile(r"(\w+):(\d+)-(\d+)")
+from msps_dimorphism.site_regions import (
+    Region,
+    get_region,
+    is_in_region,
+    first_idx_in_region,
+)
+
 
 Sample_Indices = List[int]
 FreqDict = Dict[str, float]
 Distrib = List[float]
-
-
-class Region(NamedTuple):
-    segment: str = ""
-    start: int = 0
-    end: int = -1
-
-
-def get_region(ctx, param, region_str: Optional[str]) -> Region:
-    """
-    callback validator to click command line parameter
-    """
-    if region_str is None:
-        return Region()
-
-    match_obj = region_matcher.fullmatch(region_str)
-    if match_obj is not None:
-        segment, start, end = (
-            match_obj.group(1),
-            int(match_obj.group(2)),
-            int(match_obj.group(3)),
-        )
-        if start <= end and start >= 1 and end >= 1:
-            return Region(segment, start, end)
-    raise click.BadParameter(
-        "region does not conform to requirements: 'seg:start-end', 1-based, end>=start."
-    )
 
 
 def get_sample_indices(jvcf, samples: List[str] = None) -> Sample_Indices:
@@ -55,17 +33,6 @@ def get_sample_indices(jvcf, samples: List[str] = None) -> Sample_Indices:
         for sample in samples:
             result.append(all_samples[sample])
     return result
-
-
-def is_in_region(site_json, region: Region) -> bool:
-    if region.segment == "":
-        return True
-    site_segment = site_json["SEG"]
-    site_pos = int(site_json["POS"])
-    if region.segment == site_segment:
-        if region.start <= site_pos <= region.end:
-            return True
-    return False
 
 
 def wire(cur_idx: int, next_idx: int, nesting_lvl: int, jvcf, result: Graph) -> None:
@@ -148,14 +115,7 @@ def make_site_graph(jvcf, region: Region) -> Graph:
     else:
         lvl1_indices = sorted(map(int, jvcf["Lvl1_Sites"]))
 
-    # Position first index within :param: region
-    cur_idx = 0
-    try:
-        while not is_in_region(jvcf["Sites"][cur_idx], region):
-            cur_idx += 1
-    except IndexError as e:
-        print(f"ERROR: No sites fall within specified region {region}")
-        raise IndexError from None
+    cur_idx = first_idx_in_region(jvcf["Sites"], region)
 
     next_idx = get_next_greater(cur_idx, lvl1_indices, num_sites)
     if next_idx == num_sites:
@@ -360,15 +320,14 @@ def annotate_vertices(
     type=click.Path(exists=True),
 )
 @click.argument("jvcf_input", type=click.Path(exists=True))
-@click.argument("output_dir", type=str)
+@click.argument("output_prefix", type=str)
 def main(
-    region: Region, partition_file: click.Path, jvcf_input: click.Path, output_dir: str
+    region: Region,
+    partition_file: click.Path,
+    jvcf_input: click.Path,
+    output_prefix: str,
 ):
-    output_dir = Path(output_dir)
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True)
-    else:
-        assert output_dir.is_dir()
+    output_prefix = Path(output_prefix)
 
     with open(jvcf_input) as fin:
         jvcf = json.load(fin)
@@ -380,7 +339,7 @@ def main(
         annotate_vertices(
             graph_copy, jvcf, [None], list(diversity_metrics.keys()), compute_diversity
         )
-        graph_copy.write_gml(str(output_dir / "all_samples.gml"))
+        graph_copy.write_gml(f"{output_prefix}_all_samples.gml")
     else:
         with open(partition_file) as fin:
             partitions = [line.rstrip().split("\t") for line in fin.readlines()]
@@ -395,7 +354,7 @@ def main(
                     list(diversity_metrics.keys()),
                     compute_diversity,
                 )
-                graph_copy.write_gml(str(output_dir / f"partition_{idx+1}.gml"))
+                graph_copy.write_gml(f"{output_prefix}_partition_{idx+1}.gml")
 
             # Divergence metrics for each pair of partitions
             for combination in combinations(range(len(partitions)), 2):
@@ -412,7 +371,7 @@ def main(
                 )
 
                 combin_name = f"partition_{combination[0]+1}_vs_{combination[1]+1}.gml"
-                graph_copy.write_gml(str(output_dir / combin_name))
+                graph_copy.write_gml(f"{output_prefix}_{combin_name}")
 
 
 if __name__ == "__main__":

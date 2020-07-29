@@ -2,7 +2,7 @@ from io import StringIO
 
 import pytest
 
-from starting_prg.extend_intervals import (
+from make_prgs.extend_intervals import (
     DisjointInterval,
     load_existing_features,
     extend_features,
