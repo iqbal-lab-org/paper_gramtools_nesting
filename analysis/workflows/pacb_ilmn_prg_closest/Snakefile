@@ -1,0 +1,106 @@
+"""
+This workflow finds the closest input sequence to a fasta assembly. In context of pacb_ilmn_validation workflow, we find the closest prg input sequence to give a minimal target for gramtools inferred personalised reference.
+
+This workflow regenerates sequences from vcfs using same rules as make_prgs workflow because it needs to use the same gene lengths as pacb_ilmn_validation (ie without 5kb flanks for eg)
+"""
+
+from pathlib import Path
+
+WORKFLOW = "pacb_ilmn_prg_closest"
+
+configfile: "analysis/configs/common.yaml"
+configfile: "analysis/configs/pacb_ilmn_validation/pfalciparum.yaml"
+configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
+
+# Get assemblies to process
+assembly_idx_dir = Path(f'{config["output_dir"]}/pacb_ilmn_validation/bowtie_indexes')
+ASSEMBLIES = glob_wildcards(assembly_idx_dir / "{assembly}.rev.1.bt2").assembly
+
+# Get (input prg) samples/vcfs to process
+include: "../pacb_ilmn_validation/utils.py"
+excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
+SAMPLES = get_samples(config["sample_tsv"], excluded)
+include: "../make_prgs/utils.py"
+vcfs = load_vcf_names(config["pf_release_3"]["cortex_vcf_list"])
+
+# Get genes to process
+with open(config["starting_prg"]["gene_list"]) as f:
+	GENES = f.read().splitlines()
+
+
+#____Output paths___#
+output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
+output_portions = output_base / "gene_sequences"
+output_alignments = output_base / "alignments"
+mk_output_dirs(dir())
+
+
+rule all:
+	input:
+		str(output_base / "stats.tsv")
+
+
+rule make_var_sample_portions:
+	input:
+		var_bed = config["starting_prg"]["var_regions"],
+		ref_genome = config["pf_release_3"]["fasta"],
+		vcf_file = lambda wildcards: vcfs[wildcards.sample]
+	params:
+		outdir=f"{str(output_portions)}/{{sample}}"
+	output:
+		temp(expand(f"{str(output_portions)}/{{sample}}/{{gene}}.fa",gene = GENES, allow_missing=True))
+	shell:
+		"""
+		mkdir -p {params.outdir}
+		clean_vcf={params.outdir}/clean.vcf
+		bcftools view -f PASS {input.vcf_file} | bcftools norm -c x -f {input.ref_genome} -Oz > ${{clean_vcf}}.gz
+		bcftools index ${{clean_vcf}}.gz
+		IFS="\n"; for gene_line in $(cat {input.var_bed})
+		do
+			IFS="\t"; elems=($gene_line)	
+			adj_start=$((${{elems[1]}} + 1))
+			reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+			fout={params.outdir}/${{elems[3]}}.fa
+			samtools faidx {input.ref_genome} $reg | bcftools consensus -s {wildcards.sample} ${{clean_vcf}}.gz |
+				sed 's/>.*/>'{wildcards.sample}'/' > $fout
+		done
+		"""
+
+rule cat_var_portions:
+	input:
+		samples=expand(f"{str(output_portions)}/{{sample}}/{{gene}}.fa",sample = vcfs.keys(), allow_missing=True)
+	output:
+		seqs=f"{str(output_portions)}/{{gene}}.fa",
+	run:
+		with open(output.seqs, "w") as fout:
+			for portion in [input.ref] + input.samples:
+				with open(portion) as fin:
+					sequence = fin.read()	
+				fout.write(sequence)
+
+rule align_to_assemblies:
+	input:
+		gene_portions=f"{output_portions}/{{gene}}.fa",
+		assembly=f'{assembly_idx_dir}/{{assembly}}',
+		var_bed = config["starting_prg"]["var_regions"],
+	output:
+		alignment_file='{output_alignments}/{{assembly}}_{{gene}}.sam',
+		stats_file=temp('{output_alignments}/{{assembly}}_{{gene}}.tsv'),
+	shell:
+		"""
+		bowtie2 -x {input.assembly} -U {input.gene_portions} -f > {output.alignment_file}
+		gene_line=$(grep {wildcards.gene} {input.var_bed}
+		IFS="\t"; elems=($gene_line)	
+		gene_len=$(($elems[2] - $elems[1] + 1))
+		best_match=$(grep -Eo 'NM:i:[0-9]+' {output.alignment_file} | cut -f 3 -d ':' | sort -n | head -n 1)
+		best_match_frac=$(echo $best_match / $gene_len | bc -l)
+		echo -e "{wildcards.gene}\t{wildcards.assembly}\t${{best_match_frac}}"  > {output.stats_file}
+		"""
+
+rule concat_stats:
+	input:
+		expand(f'{output_alignments}/{{assembly}}_{{gene}}.tsv', assembly = ASSEMBLIES, gene = GENES)
+	output:
+		str(output_base / "stats.tsv")
+	shell:
+		"cat {input} > {output}"
