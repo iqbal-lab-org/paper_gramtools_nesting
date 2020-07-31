@@ -35,8 +35,8 @@ mk_output_dirs(dir())
 
 # Get samples
 excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
-SAMPLES = get_samples(config["sample_tsv"], excluded)
-#SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8'})
+#SAMPLES = get_samples(config["sample_tsv"], excluded)
+SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8'})
 
 rule all:
 	input:

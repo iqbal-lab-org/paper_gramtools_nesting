@@ -6,6 +6,7 @@ from pathlib import Path
 from pysam import AlignmentFile
 import seaborn as sns
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def usage():
@@ -112,13 +113,31 @@ def write_stats(sam_file_list: List[Path], output_stats: Path, gene_lengths):
 
 
 def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path):
-    condition_order = sorted(list(set(stats_data["condition"])))
-    NM = sns.FacetGrid(stats_data, col="gene", height=6, aspect=1)
-    NM.map(
-        sns.boxplot, "condition", metric, order=condition_order,
-    )
-    NM.map(sns.swarmplot, "condition", metric, order=condition_order, color=".25")
-    NM.savefig(str(output_dir / f"{metric}.pdf"))
+    mean_metric = stats_data.groupby(["condition"])[metric].mean()
+    condition_order = list(mean_metric.sort_values(ascending=False).index)
+    for gene in set(stats_data["gene"]):
+        plt.figure(figsize=(10, 7))
+        filtered = stats_data[stats_data["gene"] == gene]
+        ax = sns.boxplot(
+            data=filtered,
+            x="condition",
+            y=metric,
+            order=condition_order,
+            color=sns.xkcd_rgb["windows blue"],
+            whis=10000000,
+        )
+        ax = sns.swarmplot(
+            data=filtered, x="condition", y=metric, color=".2", order=condition_order
+        )
+        ax.figure.savefig(str(output_dir / f"{metric}_{gene}.pdf"))
+        ax = None
+    # If want to plot both box and swarmplot in facetgrid, use below, but this makes the data points and axes too small
+    # plot = sns.FacetGrid(stats_data, col="gene", height=6, aspect=1)
+    # plot.map(
+    #    sns.boxplot, "condition", metric, order=condition_order,
+    # )
+    # plot.map(sns.swarmplot, "condition", metric, order=condition_order, color=".25")
+    # plot.savefig(str(output_dir / f"{metric}.pdf"))
 
 
 if __name__ == "__main__":

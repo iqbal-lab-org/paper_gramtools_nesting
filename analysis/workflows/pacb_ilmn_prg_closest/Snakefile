@@ -33,15 +33,18 @@ output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
 output_portions = output_base / "gene_portions"
 output_seqs = output_base / "gene_sequences"
 output_alignments = output_base / "alignments"
+output_plots = output_base / "plots"
 mk_output_dirs(dir())
 
 #__Input paths__#
 output_bowtie_indexes = Path(f'{config["output_dir"]}/pacb_ilmn_validation/bowtie_indexes')
+GMTOOLS_COMMIT = get_gmtools_commit()
+validation_stats = Path(f'{config["output_dir"]}/pacb_ilmn_validation/pf_4surfants/{GMTOOLS_COMMIT}/plots/stats.tsv')
 
 
 rule all:
 	input:
-		str(output_base / "stats.tsv")
+		expand(f'{output_plots}/{{gene}}_gmtools_delta.pdf',gene = GENES)
 
 
 rule make_var_sample_portions:
@@ -112,7 +115,7 @@ rule get_stats:
 		best_match=$(echo $all_NM | head -n 1)
 		echo ""
 		best_match_frac=$(echo $best_match / $gene_len | bc -l)
-		echo -e "{wildcards.gene}\t{wildcards.assembly}\t${{best_match_frac}}"  > {output.stats_file}
+		echo -e "{wildcards.gene}\t{wildcards.assembly}\t${{best_match_frac}}\tclosest_in_prg"  > {output.stats_file}
 		"""
 
 rule concat_stats:
@@ -122,7 +125,18 @@ rule concat_stats:
 		str(output_base / "stats.tsv")
 	shell:
 		"""
-		echo "gene\tassembly\tclosest_input_prg\n > {output}
+		echo "gene\tsample\tNM\tcondition\n" > {output}
 		cat {input} >> {output}
 		"""
+
+rule plot_delta_NM:
+	input:
+		closest_prg_stats = rules.concat_stats.output,
+		validation_stats = validation_stats,
+	output:
+		expand(f'{output_plots}/{{gene}}_gmtools_delta.pdf',gene = GENES)
+	params:
+		script=f'{config["scripts"]}/{WORKFLOW}/process_stats.py'
+	shell:
+		f"python3 {{params.script}} {{input.validation_stats}} {{input.closest_prg_stats}} {output_plots}"
 		

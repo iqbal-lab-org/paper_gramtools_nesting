@@ -23,13 +23,13 @@ Hapg_Dict = Dict[SiteIdx, Hapgs]
 def get_hapgs_one_site(site_json, num_samples: int) -> Hapgs:
     """
     If a sample has a null genotype, the return haplogroup (hapg)
-    is 0 by convention.
+    is -1 by convention.
     """
-    result: Hapgs = [0] * num_samples
+    result: Hapgs = [-1] * num_samples
     for sample_idx, gt in enumerate(site_json["GT"]):
         if gt[0] is not None:
             sample_hapg = site_json["HAPG"][sample_idx][0]
-            result[sample_idx] = sample_hapg + 1
+            result[sample_idx] = sample_hapg
     return result
 
 
@@ -68,7 +68,7 @@ def get_clustermap(df: pd.DataFrame, site_is_nested: List[bool]):
     """
     Use custom discrete colourmap and custom colour bar showing dicrete labels
     """
-    num_colours = df.max().max() + 1
+    num_colours = df.max().max() + 2  # + 2 to account for hapgs -1 and 0
     colourmap = sns.cubehelix_palette(
         reverse=True, n_colors=num_colours, hue=0.95, rot=0.5
     )
@@ -90,7 +90,7 @@ def get_clustermap(df: pd.DataFrame, site_is_nested: List[bool]):
             for i in range(num_colours)
         ]
     )
-    cbar.set_ticklabels(list(range(num_colours)))
+    cbar.set_ticklabels(list(range(-1, num_colours - 1)))
     return hmap
 
 
