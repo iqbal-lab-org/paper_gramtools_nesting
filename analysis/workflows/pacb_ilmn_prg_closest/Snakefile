@@ -12,14 +12,13 @@ configfile: "analysis/configs/common.yaml"
 configfile: "analysis/configs/pacb_ilmn_validation/pfalciparum.yaml"
 configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
 
-# Get assemblies to process
-assembly_idx_dir = Path(f'{config["output_dir"]}/pacb_ilmn_validation/bowtie_indexes')
-ASSEMBLIES = glob_wildcards(assembly_idx_dir / "{assembly}.rev.1.bt2").assembly
 
-# Get (input prg) samples/vcfs to process
+# Get assemblies to process
 include: "../pacb_ilmn_validation/utils.py"
 excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
-SAMPLES = get_samples(config["sample_tsv"], excluded)
+ASSEMBLIES = get_samples(config["sample_tsv"], excluded)
+
+# Get input prg vcfs to process
 include: "../make_prgs/utils.py"
 vcfs = load_vcf_names(config["pf_release_3"]["cortex_vcf_list"])
 
@@ -29,14 +28,20 @@ with open(config["starting_prg"]["gene_list"]) as f:
 
 
 #____Output paths___#
+include: "../common_utils.py"
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
-output_portions = output_base / "gene_sequences"
+output_portions = output_base / "gene_portions"
+output_seqs = output_base / "gene_sequences"
 output_alignments = output_base / "alignments"
 mk_output_dirs(dir())
+
+#__Input paths__#
+output_bowtie_indexes = Path(f'{config["output_dir"]}/pacb_ilmn_validation/bowtie_indexes')
 
 
 rule all:
 	input:
+		#samples=expand(f"{str(output_portions)}/{{sample}}/{{gene}}.fa",sample = vcfs.keys(), gene = GENES)
 		str(output_base / "stats.tsv")
 
 
@@ -46,9 +51,9 @@ rule make_var_sample_portions:
 		ref_genome = config["pf_release_3"]["fasta"],
 		vcf_file = lambda wildcards: vcfs[wildcards.sample]
 	params:
-		outdir=f"{str(output_portions)}/{{sample}}"
+		outdir=f"{output_portions}/{{sample}}"
 	output:
-		temp(expand(f"{str(output_portions)}/{{sample}}/{{gene}}.fa",gene = GENES, allow_missing=True))
+		temp(expand(f"{output_portions}/{{sample}}/{{gene}}.fa",gene = GENES, allow_missing=True))
 	shell:
 		"""
 		mkdir -p {params.outdir}
@@ -68,31 +73,41 @@ rule make_var_sample_portions:
 
 rule cat_var_portions:
 	input:
-		samples=expand(f"{str(output_portions)}/{{sample}}/{{gene}}.fa",sample = vcfs.keys(), allow_missing=True)
+		samples=expand(f"{output_portions}/{{sample}}/{{gene}}.fa",sample=vcfs.keys(), allow_missing=True)
 	output:
-		seqs=f"{str(output_portions)}/{{gene}}.fa",
+		seqs=f"{output_seqs}/{{gene}}.fa",
 	run:
 		with open(output.seqs, "w") as fout:
-			for portion in [input.ref] + input.samples:
+			for portion in input.samples:
 				with open(portion) as fin:
 					sequence = fin.read()	
 				fout.write(sequence)
 
 rule align_to_assemblies:
 	input:
-		gene_portions=f"{output_portions}/{{gene}}.fa",
-		assembly=f'{assembly_idx_dir}/{{assembly}}',
-		var_bed = config["starting_prg"]["var_regions"],
+		gene_portions=rules.cat_var_portions.output.seqs,
+		index=expand(f'{output_bowtie_indexes}/{{assembly}}.{{ext}}',ext=bowtie2_idx_extensions, allow_missing=True),
 	output:
-		alignment_file='{output_alignments}/{{assembly}}_{{gene}}.sam',
-		stats_file=temp('{output_alignments}/{{assembly}}_{{gene}}.tsv'),
+		alignment_file=f'{output_alignments}/{{assembly}}_{{gene}}.sam',
+	params:
+		index_prefix=f'{output_bowtie_indexes}/{{assembly}}',
 	shell:
 		"""
-		bowtie2 -x {input.assembly} -U {input.gene_portions} -f > {output.alignment_file}
-		gene_line=$(grep {wildcards.gene} {input.var_bed}
+		bowtie2 -x {params.index_prefix} -U {input.gene_portions} -f > {output.alignment_file}
+		"""
+
+rule get_stats:
+	input:
+		alignment_file=f'{output_alignments}/{{assembly}}_{{gene}}.sam',
+		var_bed = config["starting_prg"]["var_regions"],
+	output:
+		stats_file=f'{output_alignments}/{{assembly}}_{{gene}}.tsv',
+	shell:
+		"""
+		gene_line=$(grep -w {wildcards.gene} {input.var_bed})
 		IFS="\t"; elems=($gene_line)	
-		gene_len=$(($elems[2] - $elems[1] + 1))
-		best_match=$(grep -Eo 'NM:i:[0-9]+' {output.alignment_file} | cut -f 3 -d ':' | sort -n | head -n 1)
+		gene_len=$((${{elems[2]}} - ${{elems[1]}} + 1))
+		best_match=$(grep -Eo 'NM:i:[0-9]+' {input.alignment_file} | cut -f 3 -d ':' | sort -n | head -n 1)
 		best_match_frac=$(echo $best_match / $gene_len | bc -l)
 		echo -e "{wildcards.gene}\t{wildcards.assembly}\t${{best_match_frac}}"  > {output.stats_file}
 		"""

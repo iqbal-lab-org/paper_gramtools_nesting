@@ -6,11 +6,11 @@ pf_release_3:
   fai: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta"
   gff: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.gff3"
 
-    #cortex_vcf_prefix: "analysis/input_data/make_prgs/pf3k_cortex_vcfs"
-  cortex_vcf_prefix: "/nfs/research1/zi/mirror/oxford/cycloid/data3/projects/pf3k/discovery_gt/release3_for_first_paper"
+  #cortex_vcf_prefix: "/nfs/research1/zi/mirror/oxford/cycloid/data3/projects/pf3k/discovery_gt/release3_for_first_paper" # noah
+  cortex_vcf_prefix: "/nfs/leia/research/iqbal/mirror2/oxford/cycloid/data3/pf3k/discovery_gt/release3_for_first_paper/release3_for_first_paper" # yoda
 
-    #cortex_vcf_list: "analysis/input_data/make_prgs/pf3k_cortex_vcfs/vcf_list.txt"
-  cortex_vcf_list:  "/nfs/esearch1/zi/mirror/oxford/cycloid/data3/projects/pf3k/discovery_gt/release3_for_first_paper/pf3k.vcflist.txt"
+  # cortex_vcf_list:  "/nfs/esearch1/zi/mirror/oxford/cycloid/data3/projects/pf3k/discovery_gt/release3_for_first_paper/pf3k.vcflist.txt" # noah
+  cortex_vcf_list: "/nfs/leia/research/iqbal/mirror2/oxford/cycloid/data3/pf3k/discovery_gt/release3_for_first_paper/release3_for_first_paper/pf3k.vcflist.txt" # yoda
 
 
 make_prg:

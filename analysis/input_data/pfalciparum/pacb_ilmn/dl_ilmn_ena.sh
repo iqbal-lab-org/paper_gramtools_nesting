@@ -1,5 +1,5 @@
 set -eu
-base_dir="/nfs/research1/zi/bletcher/analyses/nesting_paper"
+base_dir="/hps/nobackup/zi/bletcher/nesting_paper"
 samp_accessions="${base_dir}/analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv"
 
 output_dir="${base_dir}/analysis/input_data/pfalciparum/pacb_ilmn/ilmn_reads"

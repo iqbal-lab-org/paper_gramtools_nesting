@@ -4,7 +4,7 @@ WORKFLOW = 'pacb_ilmn_validation'
 
 configfile: "analysis/configs/common.yaml"
 configfile: f"analysis/configs/{WORKFLOW}/pfalciparum.yaml"
-container: config["container"]
+#container: config["container"]
 
 include: "utils.py"
 include: "../common_utils.py"
