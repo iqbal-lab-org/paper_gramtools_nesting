@@ -6,6 +6,7 @@ import json
 import click
 import pandas as pd
 import seaborn as sns
+from matplotlib.colors import ListedColormap
 
 from msps_dimorphism.site_regions import (
     Region,
@@ -38,6 +39,8 @@ def get_hapgs_all_sites(jvcf, region: Region) -> Hapg_Dict:
     lvl1_sites = set(jvcf["Lvl1_Sites"])
     result: Hapg_Dict = dict()
 
+    site_is_nested = list()
+
     first_idx = first_idx_in_region(jvcf["Sites"], region)
     # If the first idx is not at lvl1, we can get a site following the first one which has a smaller POS and that is not in target region
     while first_idx not in lvl1_sites:
@@ -48,11 +51,47 @@ def get_hapgs_all_sites(jvcf, region: Region) -> Hapg_Dict:
         result[cur_idx - first_idx] = get_hapgs_one_site(
             jvcf["Sites"][cur_idx], num_samples
         )
+        if cur_idx in lvl1_sites:
+            site_is_nested.append(False)
+        else:
+            site_is_nested.append(True)
+
         cur_idx += 1
         if cur_idx == num_sites:
             break
 
+    result["nested"] = site_is_nested
     return result
+
+
+def get_clustermap(df: pd.DataFrame, site_is_nested: List[bool]):
+    """
+    Use custom discrete colourmap and custom colour bar showing dicrete labels
+    """
+    num_colours = df.max().max() + 1
+    colourmap = sns.cubehelix_palette(
+        reverse=True, n_colors=num_colours, hue=0.95, rot=0.5
+    )
+
+    site_is_nested = pd.Series(site_is_nested)
+    col_colours = site_is_nested.map({True: "g", False: "b"})
+    hmap = sns.clustermap(
+        df,
+        col_cluster=False,
+        yticklabels=False,
+        cmap=ListedColormap(colourmap),
+        col_colors=col_colours,
+    )
+    cbar = hmap.ax_heatmap.collections[0].colorbar
+    r = cbar.vmax - cbar.vmin
+    cbar.set_ticks(
+        [
+            cbar.vmin + 0.5 * r / (num_colours) + r * i / (num_colours)
+            for i in range(num_colours)
+        ]
+    )
+    cbar.set_ticklabels(list(range(num_colours)))
+    return hmap
 
 
 @click.command()
@@ -84,10 +123,11 @@ def main(
         jvcf = json.load(fin)
 
     hapgs_all_sites = get_hapgs_all_sites(jvcf, region)
+    site_is_nested = hapgs_all_sites.pop("nested")
     df = pd.DataFrame(hapgs_all_sites)
     df.to_csv(f"{output_prefix}_hapgs.tsv", sep="\t", index=False)
 
-    hmap = sns.clustermap(df, col_cluster=False)
+    hmap = get_clustermap(df, site_is_nested)
     hmap.savefig(f"{output_prefix}_hmap.pdf")
 
 

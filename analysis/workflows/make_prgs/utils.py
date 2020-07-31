@@ -1,15 +1,17 @@
+import re
 import csv
 from typing import Dict
 from pathlib import Path
+
+sample_name_matcher = re.compile("([^_]+)_")
 
 
 def load_vcf_names(fname: str) -> Dict:
     vcfs = dict()
     with open(fname) as fin:
         for line in fin:
-            fname = (
-                Path(config["pf_release_3"]["cortex_vcf_prefix"])
-                / Path(line.strip())
+            fname = Path(config["pf_release_3"]["cortex_vcf_prefix"]) / Path(
+                line.strip()
             )
             if not fname.exists():
                 print(f"Error: required file {fname} not found")

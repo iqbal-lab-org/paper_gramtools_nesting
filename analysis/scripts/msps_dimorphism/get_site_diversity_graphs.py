@@ -53,14 +53,16 @@ def wire(cur_idx: int, next_idx: int, nesting_lvl: int, jvcf, result: Graph) -> 
         result.add_edges([(cur_idx, next_idx)])
     else:
         children = jvcf["Child_Map"][str(cur_idx)]
-        for site_indices in children.values():
-            for array_idx, child_idx in enumerate(site_indices):
+        for child_indices in children.values():
+            # it is vital to sort the child indices, as they are numbered according to their POS (lowest first), and we want graph topology to reflect POS
+            sorted_child_indices = sorted(child_indices)
+            for array_idx, child_idx in enumerate(sorted_child_indices):
                 if array_idx == 0:
                     result.add_edges([(cur_idx, child_idx)])
-                if array_idx < len(site_indices) - 1:
+                if array_idx < len(child_indices) - 1:
                     wire(
                         child_idx,
-                        site_indices[array_idx + 1],
+                        sorted_child_indices[array_idx + 1],
                         nesting_lvl + 1,
                         jvcf,
                         result,
@@ -94,8 +96,10 @@ def site_graph_copy(other: Graph) -> Graph:
         result.vs[attr] = other.vs[attr]
     for edge in other.es:
         result.add_edges([(edge.source, edge.target)])
-    result["names"] = other["names"]
-    result.vs["name"] = other.vs["name"]  # To keep info on absolute site index
+    result["idxs_in_prg"] = other["idxs_in_prg"]
+    result.vs["idx_in_prg"] = other.vs[
+        "idx_in_prg"
+    ]  # To keep info on absolute site index
     return result
 
 
@@ -141,9 +145,9 @@ def make_site_graph(jvcf, region: Region) -> Graph:
         else:
             to_keep.append(idx)
     result.delete_vertices(to_delete)
-    result.vs["name"] = to_keep
+    result.vs["idx_in_prg"] = to_keep
 
-    result["names"] = set(to_keep)
+    result["idxs_in_prg"] = set(to_keep)
 
     return result
 
@@ -294,7 +298,7 @@ def annotate_vertices(
     all_sites = jvcf["Sites"]
     new_attributes = {attr_name: list() for attr_name in attr_names}
     for idx, site_json in enumerate(all_sites):
-        if idx not in graph["names"]:
+        if idx not in graph["idxs_in_prg"]:
             continue
         result = annotation_function(site_json, *partitions)
         for attr_name, value in result.items():

@@ -29,14 +29,14 @@ output_samtools_pers_ref = output_gene_list / vcf_outputs_dirs[3]
 output_alignments = output_gene_list / f'alignments_{Path(config["starting_prg"]["var_regions"]).stem}'
 output_gene_portions = output_alignments / "gene_portions"
 output_bowtie_indexes = Path(f'{output_base}/bowtie_indexes')
-
 output_plots = Path(f'{output_gene_list}/plots')
 
 mk_output_dirs(dir())
 
+# Get samples
 excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
-#SAMPLES = get_samples(config["sample_tsv"], excluded)
-SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8'})
+SAMPLES = get_samples(config["sample_tsv"], excluded)
+#SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8'})
 
 rule all:
 	input:

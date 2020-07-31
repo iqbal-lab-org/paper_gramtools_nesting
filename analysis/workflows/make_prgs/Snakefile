@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 
 WORKFLOW = "make_prgs"
@@ -21,8 +20,6 @@ output_prgs = output_base / "prgs"
 
 with open(config["genes"]) as f:
 	genes = f.read().splitlines()
-
-sample_name_matcher = re.compile("([^_]+)_")
 
 vcfs = load_vcf_names(config["pf_release_3"]["cortex_vcf_list"])
 
