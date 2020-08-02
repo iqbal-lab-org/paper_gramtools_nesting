@@ -1,3 +1,11 @@
+"""
+This workflow takes a reference genome, reads files and assemblies for those reads files, a set of genomic regions and a prg and runs:
+	- align ref genome at regions against assemblies
+	- discover variants against ref genome using cortex and samtools
+	- gramtools genotype the reads using prg
+	- discover variants against gramtools inferred personalised ref genome using cortex and samtools
+	- align sequences of inferred regions (cortex, samtools, gramtools) against assemblies and record closeness
+"""
 from pathlib import Path
 
 WORKFLOW = 'pacb_ilmn_validation'
@@ -20,11 +28,12 @@ output_gene_list = Path(f'{output_base}/{gene_list}/{GMTOOLS_COMMIT}')
 
 # Bit of trickery with dirs: in rule align_induced_gene_seqs, require rules to produce outputs without '/' in wildcard name,
 # so refer to this array's elements directly
-vcf_outputs_dirs = ["cortex_baseline_ref", "gramtools_genotype", "cortex_pers_ref", "samtools_pers_ref"]
+vcf_outputs_dirs = ["cortex_baseline_ref", "samtools_baseline_ref","gramtools_genotype", "cortex_pers_ref", "samtools_pers_ref"]
 output_cortex_baseline_ref = output_gene_list / vcf_outputs_dirs[0]
-output_gramtools_genotype = output_gene_list / vcf_outputs_dirs[1]
-output_cortex_pers_ref = output_gene_list / vcf_outputs_dirs[2]
-output_samtools_pers_ref = output_gene_list / vcf_outputs_dirs[3]
+output_samtools_baseline_ref = output_gene_list / vcf_outputs_dirs[1]
+output_gramtools_genotype = output_gene_list / vcf_outputs_dirs[2]
+output_cortex_pers_ref = output_gene_list / vcf_outputs_dirs[3]
+output_samtools_pers_ref = output_gene_list / vcf_outputs_dirs[4]
 
 output_alignments = output_gene_list / f'alignments_{Path(config["starting_prg"]["var_regions"]).stem}'
 output_gene_portions = output_alignments / "gene_portions"
@@ -35,8 +44,8 @@ mk_output_dirs(dir())
 
 # Get samples
 excluded = {'3D7', 'ML01'} # No ilmn reads for accession in Otto paper
-#SAMPLES = get_samples(config["sample_tsv"], excluded)
-SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8'})
+SAMPLES = get_samples(config["sample_tsv"], excluded)
+#SAMPLES = get_samples(config["sample_tsv"], excluded, included={'7G8'})
 
 rule all:
 	input:
@@ -96,6 +105,22 @@ rule cortex_baseline_ref:
 		bcftools index {output.out_vcf}
 		"""
 
+rule samtools_baseline_ref:
+	input:
+		fasta_ref=config["starting_prg"]["fasta_ref"],
+		reads_files=get_reads
+	output:
+		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz',
+		bcftools_index=f'{output_samtools_baseline_ref}/{{sample}}.vcf.gz.csi'
+	params:
+		samtools_script=f'{config["scripts"]}/{WORKFLOW}/run_samtools_caller.sh',
+	shadow: "shallow"
+	threads: 10
+	resources:
+		mem_mb=10000
+	shell:
+		"bash {params.samtools_script} {input.fasta_ref} '{input.reads_files}' {output.out_vcf} {threads}"
+
 rule gramtools_genotype:
 	input:
 		gram_build_completed=rules.gram_build.output,
@@ -104,7 +129,7 @@ rule gramtools_genotype:
 
 	output:
 		sample_geno_dir=directory(f'{output_gramtools_genotype}/{{sample}}'),
-		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz',
+		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[2]}/{{sample}}.vcf.gz',
 		bcftools_index=f'{output_gramtools_genotype}/{{sample}}.vcf.gz.csi',
 		rebasing_map=f'{output_gramtools_genotype}/{{sample}}/genotype/rebasing_map.json',
 		pers_ref=f'{output_gramtools_genotype}/{{sample}}/genotype/personalised_reference.fasta',
@@ -127,7 +152,7 @@ rule cortex_pers_ref:
 		geno_vcf=rules.gramtools_genotype.output.out_vcf
 
 	output:
-		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[2]}/{{sample}}.vcf.gz',
+		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[3]}/{{sample}}.vcf.gz',
 		sample_discov_dir=directory(f'{output_cortex_pers_ref}/{{sample}}'),
 		bcftools_index=f'{output_cortex_pers_ref}/{{sample}}.vcf.gz.csi',
 
@@ -151,22 +176,16 @@ rule samtools_pers_ref:
 		pers_ref=rules.gramtools_genotype.output.pers_ref,
 
 	output:
-		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[3]}/{{sample}}.vcf.gz',
+		out_vcf=f'{output_gene_list}/{vcf_outputs_dirs[4]}/{{sample}}.vcf.gz',
 		bcftools_index=f'{output_samtools_pers_ref}/{{sample}}.vcf.gz.csi',
+	params:
+		samtools_script=f'{config["scripts"]}/{WORKFLOW}/run_samtools_caller.sh',
 	shadow: "shallow"
 	threads: 10
 	resources:
 		mem_mb=10000
 	shell:
-		"""
-		bwa index {input.pers_ref}
-		bwa mem -t {threads} {input.pers_ref} {input.reads_files} -o mapped.sam
-		samtools sort -o mapped.bam -O BAM mapped.sam
-		samtools index mapped.bam
-		bcftools mpileup -f {input.pers_ref} mapped.bam | bcftools call -O z -o {output.out_vcf} -vm --ploidy 1
-		bcftools index {output.out_vcf}
-		rm {input.pers_ref}.*
-		"""
+		"bash {params.samtools_script} {input.pers_ref} '{input.reads_files}' {output.out_vcf} {threads}"
 
 
 rule align_induced_gene_seqs:
