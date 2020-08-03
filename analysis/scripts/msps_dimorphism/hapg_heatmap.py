@@ -124,8 +124,10 @@ def main(
 
     hapgs_all_sites = get_hapgs_all_sites(jvcf, region)
     site_is_nested = hapgs_all_sites.pop("nested")
-    df = pd.DataFrame(hapgs_all_sites)
-    df.to_csv(f"{output_prefix}_hapgs.tsv", sep="\t", index=False)
+
+    sample_names = [sample["Name"] for sample in jvcf["Samples"]]
+    df = pd.DataFrame(hapgs_all_sites, index=sample_names)
+    df.to_csv(f"{output_prefix}_hapgs.tsv", sep="\t")
 
     hmap = get_clustermap(df, site_is_nested)
     hmap.savefig(f"{output_prefix}_hmap.pdf")

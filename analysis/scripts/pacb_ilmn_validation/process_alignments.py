@@ -129,6 +129,7 @@ def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path)
         ax = sns.swarmplot(
             data=filtered, x="condition", y=metric, color=".2", order=condition_order
         )
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=20)
         ax.figure.savefig(str(output_dir / f"{metric}_{gene}.pdf"))
         ax = None
     # If want to plot both box and swarmplot in facetgrid, use below, but this makes the data points and axes too small

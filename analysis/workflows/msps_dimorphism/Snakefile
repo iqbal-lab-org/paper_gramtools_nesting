@@ -22,6 +22,7 @@ output_trees = output_base / "phylo_trees"
 output_tree_splits = output_trees / "tree_splits"
 output_graphs = output_base / "graphs"
 output_heatmaps = output_base / "heatmaps"
+output_clusters = output_base / "clusters"
 
 mk_output_dirs(dir())
 
@@ -38,7 +39,8 @@ samples = get_bams(config["pf3k"]["bams_filelist"]) # in utils.py
 rule all:
 	input:
 		graphs=expand(f"{output_graphs}/{{gene}}_{{filename}}.gml", gene = genes, filename = ["all_samples", "partition_1", "partition_2"]),
-		heatmaps=expand(f"{output_heatmaps}/{{gene}}_hmap.pdf", gene = genes)
+		heatmaps=expand(f"{output_heatmaps}/{{gene}}_hmap.pdf", gene = genes),
+		cluster_dists=expand(f'{output_clusters}/{{gene}}_cluster_distmatrix.tsv', gene=genes)
 
 rule build:
 	input:
@@ -210,3 +212,15 @@ rule build_heatmaps:
 
 		python3 {params.script} {input.res_json} {params.output_prefix} --region $reg
 		"""
+
+rule cluster_dists:
+	input:
+		sequences=rules.cat_sequences.output,
+		hapg_matrix=rules.build_heatmaps.output.hapg_data,
+	output:
+		f'{output_clusters}/{{gene}}_cluster_distmatrix.tsv'
+	params:
+		script=f'{config["scripts"]}/{WORKFLOW}/cluster_distances.py',
+		output_prefix=f'{output_clusters}/{{gene}}'
+	shell:
+		"python3 {params.script} {input.hapg_matrix} {input.sequences} {params.output_prefix}"

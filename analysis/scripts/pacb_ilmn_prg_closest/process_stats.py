@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     diff_df = pd.DataFrame(diff_df_rows)
     for gene in set(diff_df["gene"]):
-        plt.figure(figsize=(10, 7))
+        plt.figure(figsize=(7, 9))
         filtered = diff_df[diff_df["gene"] == gene]
         ax = sns.boxplot(
             data=filtered,
