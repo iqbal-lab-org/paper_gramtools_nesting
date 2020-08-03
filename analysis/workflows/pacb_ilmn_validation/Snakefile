@@ -19,7 +19,10 @@ include: "../common_utils.py"
 
 GMTOOLS_COMMIT = get_gmtools_commit()
 
-gene_list = Path(config["starting_prg"]["gene_list"]).stem
+gene_list = Path(config["starting_prg"]["gene_list"])
+with gene_list.open() as fin:
+	GENES = fin.read().splitlines()
+gene_list = gene_list.stem
 
 #_____Set up output paths______#
 output_gram_build = Path(f'{config["gram_builds_dir"]}/{gene_list}/{GMTOOLS_COMMIT}')
@@ -50,7 +53,7 @@ SAMPLES = get_samples(config["sample_tsv"], excluded)
 rule all:
 	input:
 		f'{output_plots}/stats.tsv',
-		f'{output_plots}/NM.pdf',
+		expand(f'{output_plots}/NM_{{gene}}.pdf', gene=GENES),
 
 
 rule index_pacb_assemblies:
@@ -281,7 +284,7 @@ rule process_and_plot_alignments:
 		var_regions=config["starting_prg"]["var_regions"],
 	output:
 		f'{output_plots}/stats.tsv',
-		f'{output_plots}/NM.pdf',
+		expand(f'{output_plots}/NM_{{gene}}.pdf', gene=GENES),
 	params:
 		processing_script=f'{config["scripts"]}/{WORKFLOW}/process_alignments.py'
 	shell:
