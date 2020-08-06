@@ -9,8 +9,8 @@ container: config["container"]
 include: "utils.py"
 
 # Paths
-gene_list = Path(config["genes"]).stem
-output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/{gene_list}')
+prg_name = config["prg_name"]).stem
+output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/{config["prg_name"]}')
 output_base.mkdir(exist_ok=True, parents=True)
 
 output_bed = output_base / "beds"
@@ -21,7 +21,7 @@ output_prgs = output_base / "prgs"
 with open(config["genes"]) as f:
 	genes = f.read().splitlines()
 
-vcfs = load_vcf_names(config["pf_release_3"]["cortex_vcf_list"])
+vcfs = load_vcf_names(config["vcf_list"])
 
 rule all:
 	input:
@@ -30,13 +30,46 @@ rule all:
 		min_match=config["make_prg"]["min_match"])
 
 
+if "genes" in config:
+	# Case: make a bed from a list of genes and a gff file of a genome
+	rule starting_bed:
+		input:
+			faidx=config["genome_fai"],
+			ref_annot=config["gff"],
+			genes=config["genes"]
+		output:
+			ori_var_bed = f'{str(output_bed)}/genes.bed',
+		shell:
+			"""
+			mkdir -p {output.ori_var_bed}/..
+			genes=($(cat {input.genes}))
+			grep_cmd="grep {input.ref_annot}"
+			> {output.ori_var_bed}
+			for gene in ${{genes[@]}}
+				do $grep_cmd -e "$gene;" | awk '{{$4-=1;print $1"\t"$4"\t"$5"\t""'$gene'"}}' >> {output.ori_var_bed}
+			done
+
+			bedtools sort -i {output.ori_var_bed} -faidx {input.faidx} > tmp.bed
+			mv tmp.bed {output.ori_var_bed} && rm tmp.bed
+			"""
+
+elif "initial_vcf_list" in config:
+	# Case: make a bed from a file containing a list of vcfs. The script specified in the config file determines how this happens.
+	rule starting_bed:
+		input:
+			faidx=config["genome_fai"],
+		output:
+			ori_var_bed = f'{str(output_bed)}/genes.bed',
+		shell:
+			f'bash {config["vcf_to_bed_script"} {config["script_params"]} {{output.ori_var_bed}};'
+			"bedtools sort -i {output.ori_var_bed} -faidx {input.faidx} > tmp.bed;
+			mv tmp.bed {output.ori_var_bed} && rm tmp.bed"
+	
 rule make_beds:
 	input:
-		faidx=config["pf_release_3"]["fai"],
-		ref_annot=config["pf_release_3"]["gff"],
-		genes=config["genes"]
+		faidx=config["genome_fai"],
+		ori_var_bed = rules.starting_bed.output,
 	output:
-		ori_var_bed = f'{str(output_bed)}/genes.bed',
 		var_bed = f'{str(output_bed)}/vars_{config["flank_size"]}.bed',
 		nonvar_bed = f'{str(output_bed)}/nonvars.bed',
 		full_bed = f'{str(output_bed)}/full.bed',
@@ -45,31 +78,19 @@ rule make_beds:
 		flank_size = config["flank_size"],
 	shell:
 		"""
-		mkdir -p {output_bed}
-		genes=($(cat {input.genes}))
-		grep_cmd="grep {input.ref_annot}"
-		> {output.ori_var_bed}
-		for gene in ${{genes[@]}}
-			do $grep_cmd -e "$gene;" | awk '{{$4-=1;print $1"\t"$4"\t"$5"\t""'$gene'"}}' >> {output.ori_var_bed}
-		done
-
-		bedtools sort -i {output.ori_var_bed} -faidx {input.faidx} > tmp.bed
-		mv tmp.bed {output.ori_var_bed}
-
-		python3 {params.extension_script} {output.ori_var_bed} {params.flank_size} {output.var_bed} --force
+		python3 {params.extension_script} {input.ori_var_bed} {params.flank_size} {output.var_bed} --force
 		
 		bedtools complement -i {output.var_bed} -g {input.faidx} | awk 'BEGIN{{l=1}}{{print $0"\t""nonvar_"l;l+=1}}' > {output.nonvar_bed}
 
 		cat {output.nonvar_bed} {output.var_bed} > tmp.bed
 		bedtools sort -i tmp.bed -faidx {input.faidx} > {output.full_bed}
-
 		rm tmp.bed
 		"""
 
 rule make_var_sample_portions:
 	input:
 		var_bed = rules.make_beds.output.var_bed,
-		ref_genome = config["pf_release_3"]["fasta"],
+		ref_genome = config["genome_fasta"],
 		vcf_file = lambda wildcards: vcfs[wildcards.sample]
 	params:
 		outdir=f"{str(output_portions)}/{{sample}}"
@@ -95,7 +116,7 @@ rule make_var_sample_portions:
 rule make_var_ref_portions:
 	input:
 		var_bed = rules.make_beds.output.var_bed,
-		ref_genome = config["pf_release_3"]["fasta"],
+		ref_genome = config["genome_fasta"],
 	params:
 		outdir=f"{str(output_portions)}/ref"
 	output:
@@ -163,7 +184,7 @@ rule make_var_prgs:
 rule make_nonvar_prgs:
 	input:	
 		nonvars=rules.make_beds.output.nonvar_bed,
-		ref_genome = config["pf_release_3"]["fasta"],
+		ref_genome = config["genome_fasta"],
 	output:
 		touch(f"{str(output_prgs)}/nonvars/nonvars_done.txt")
 	params:
