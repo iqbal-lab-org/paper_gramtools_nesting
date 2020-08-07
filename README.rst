@@ -37,14 +37,6 @@ This is to simulate paths in a given prg and genotype them, without comparing co
 It can be used to evaluate changes in performance when changing, for eg, the genotyping model.
 
 
-Evaluating genotyping
-``````````````````````
-
-Commits:
-
-* 00eeef18 : no GCP
-* 71e22c47 : first introduction of GCP. 
-
 
 nestedness_simulations
 -----------------------
