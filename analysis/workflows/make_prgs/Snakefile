@@ -3,13 +3,13 @@ from pathlib import Path
 WORKFLOW = "make_prgs"
 
 configfile: "analysis/configs/common.yaml"
-configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
+#configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
+configfile: "analysis/configs/make_prgs/mtuberculosis.yaml"
 container: config["container"]
 
 include: "utils.py"
 
 # Paths
-prg_name = config["prg_name"]).stem
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/{config["prg_name"]}')
 output_base.mkdir(exist_ok=True, parents=True)
 
@@ -18,10 +18,10 @@ output_portions = output_base / "sample_portions"
 output_msas = output_base / "msas"
 output_prgs = output_base / "prgs"
 
-with open(config["genes"]) as f:
-	genes = f.read().splitlines()
+with open(config["initial_bed"]) as f:
+	genes = [line.split("\t")[3].strip() for line in f]
 
-vcfs = load_vcf_names(config["vcf_list"])
+vcfs = load_vcf_names(config["vcf_list"], config["prg_name"])
 
 rule all:
 	input:
@@ -30,45 +30,10 @@ rule all:
 		min_match=config["make_prg"]["min_match"])
 
 
-if "genes" in config:
-	# Case: make a bed from a list of genes and a gff file of a genome
-	rule starting_bed:
-		input:
-			faidx=config["genome_fai"],
-			ref_annot=config["gff"],
-			genes=config["genes"]
-		output:
-			ori_var_bed = f'{str(output_bed)}/genes.bed',
-		shell:
-			"""
-			mkdir -p {output.ori_var_bed}/..
-			genes=($(cat {input.genes}))
-			grep_cmd="grep {input.ref_annot}"
-			> {output.ori_var_bed}
-			for gene in ${{genes[@]}}
-				do $grep_cmd -e "$gene;" | awk '{{$4-=1;print $1"\t"$4"\t"$5"\t""'$gene'"}}' >> {output.ori_var_bed}
-			done
-
-			bedtools sort -i {output.ori_var_bed} -faidx {input.faidx} > tmp.bed
-			mv tmp.bed {output.ori_var_bed} && rm tmp.bed
-			"""
-
-elif "initial_vcf_list" in config:
-	# Case: make a bed from a file containing a list of vcfs. The script specified in the config file determines how this happens.
-	rule starting_bed:
-		input:
-			faidx=config["genome_fai"],
-		output:
-			ori_var_bed = f'{str(output_bed)}/genes.bed',
-		shell:
-			f'bash {config["vcf_to_bed_script"} {config["script_params"]} {{output.ori_var_bed}};'
-			"bedtools sort -i {output.ori_var_bed} -faidx {input.faidx} > tmp.bed;
-			mv tmp.bed {output.ori_var_bed} && rm tmp.bed"
-	
 rule make_beds:
 	input:
 		faidx=config["genome_fai"],
-		ori_var_bed = rules.starting_bed.output,
+		ori_var_bed = config["initial_bed"],
 	output:
 		var_bed = f'{str(output_bed)}/vars_{config["flank_size"]}.bed',
 		nonvar_bed = f'{str(output_bed)}/nonvars.bed',
@@ -78,6 +43,8 @@ rule make_beds:
 		flank_size = config["flank_size"],
 	shell:
 		"""
+		bedtools sort -i {input.ori_var_bed} -faidx {input.faidx} > tmp.bed
+		mv tmp.bed {input.ori_var_bed}
 		python3 {params.extension_script} {input.ori_var_bed} {params.flank_size} {output.var_bed} --force
 		
 		bedtools complement -i {output.var_bed} -g {input.faidx} | awk 'BEGIN{{l=1}}{{print $0"\t""nonvar_"l;l+=1}}' > {output.nonvar_bed}
@@ -108,7 +75,8 @@ rule make_var_sample_portions:
 			adj_start=$((${{elems[1]}} + 1))
 			reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
 			fout={params.outdir}/${{elems[3]}}.fa
-			samtools faidx {input.ref_genome} $reg | bcftools consensus -s {wildcards.sample} ${{clean_vcf}}.gz |
+			sample_name=$(bcftools query -l ${{clean_vcf}}.gz)
+			samtools faidx {input.ref_genome} $reg | bcftools consensus -s $sample_name ${{clean_vcf}}.gz |
 				sed 's/>.*/>'{wildcards.sample}'/' > $fout
 		done
 		"""
@@ -218,5 +186,5 @@ rule concat_prgs:
 	resources:
 		mem_mb=5000
 	shell:
-		"python3 {params.concat_prg_script} {params.var_prg_dir} {input.full_bed} {output};"
-		"#rm {output_prgs}/nonvar_*"
+		"python3 {params.concat_prg_script} {params.var_prg_dir} {input.full_bed} {output}"
+

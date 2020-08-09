@@ -6,17 +6,22 @@ from pathlib import Path
 sample_name_matcher = re.compile("([^_]+)_")
 
 
-def load_vcf_names(fname: str) -> Dict:
+def load_vcf_names(fname: str, prg_name: str) -> Dict:
+    i = 0
     vcfs = dict()
     with open(fname) as fin:
         for line in fin:
-            fname = Path(config["pf_release_3"]["cortex_vcf_prefix"]) / Path(
+            fname = Path(config["vcf_prefix"]) / Path(
                 line.strip()
             )
             if not fname.exists():
                 print(f"Error: required file {fname} not found")
                 exit(1)
-            sample_name = sample_name_matcher.match(str(fname.name)).group(1)
+            if prg_name.startswith("pf"):
+                sample_name = sample_name_matcher.match(str(fname.name)).group(1)
+            else:
+                sample_name = f"sample_{i}"
+                i += 1
             vcfs[sample_name] = str(fname)
 
     return vcfs

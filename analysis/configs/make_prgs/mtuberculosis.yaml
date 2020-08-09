@@ -1,15 +1,14 @@
 prg_name: "tb_bigdel"
 flank_size: 300
+
 genome_fasta: "analysis/input_data/mtuberculosis/ref_genome/H37Rv.fasta"
 genome_fai: "analysis/input_data/mtuberculosis/ref_genome/H37Rv.fasta.fai"
 
-vcf_to_bed_script: "analysis/scripts/make_prgs/bigdel_vcfs_to_bed.sh"
-initial_vcf_list: "analysis/input/mtuberculosis/clockwork/vcfs_Comas.txt"
-script_params: 100 # minimum size of deletion record
+initial_bed: "analysis/input_data/make_prgs/beds/tb_bigdel.bed" # made from script analysis/input_data/scripts/make_prgs/bigdel_vcfs_to_bed.sh
 
-vcf_list: "analysis/input/mtuberculosis/clockwork/vcfs_1000.txt"
+vcf_list: "analysis/input_data/mtuberculosis/clockwork/vcf_list.txt"
 vcf_prefix: ""
 
 make_prg:
-max_nest: [5]
-min_match: 7
+        max_nest: [5]
+        min_match: 7
