@@ -1,0 +1,71 @@
+"""
+The workflow has some rules similar/identical to pacb_ilmn_validation workflow, but is kept distinct as it does not assess gramtools perf against other standard var callers, but against genome graph tool(s).
+"""
+WORKFLOW = 'tb_bigdel'
+
+configfile: "analysis/configs/common.yaml"
+configfile: f"analysis/configs/tb_bigdel.yaml"
+#container: config["container"]
+
+include: "../pacb_ilmn_validation/utils.py"
+include: "../common_utils.py"
+
+GMTOOLS_COMMIT = get_gmtools_commit()
+
+#_____Set up output paths______#
+output_gram_build = Path(f'{config["gram_builds_dir"]}/{WORKFLOW}/{GMTOOLS_COMMIT}')
+output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
+output_base_commit = output_base / GMTOOLS_COMMIT
+
+vcf_outputs_dirs = ["gramtools_genotype"]
+output_gramtools_genotype = output_base_commit / vcf_outputs_dirs[0]
+
+mk_output_dirs(dir())
+
+SAMPLES = get_samples(config["sample_tsv"])
+
+rule all:
+	input:
+		gram_vcfs=expand(f'{output_base_commit}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz', sample = SAMPLES)
+
+rule gram_build:
+	input:
+		prg=config["starting_prg"]["prg"],
+		ref=config["starting_prg"]["fasta_ref"]
+		
+	output:
+		f'{output_gram_build}/cov_graph',
+
+	params:
+		k=config["kmer_size"],
+		gram_dir=output_gram_build,
+
+	resources:
+		mem_mb=20000
+
+	shell:
+		"""
+		gramtools build --prg {input.prg} --ref {input.ref} --kmer_size {params.k} --gram_dir {params.gram_dir} --force
+		"""
+
+rule gramtools_genotype:
+	input:
+		gram_build_completed=rules.gram_build.output,
+		gram_dir=f'{Path(rules.gram_build.output[0]).parent}',
+		reads_files=get_reads
+
+	output:
+		sample_geno_dir=directory(f'{output_gramtools_genotype}/{{sample}}'),
+		out_vcf=f'{output_base_commit}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz',
+		bcftools_index=f'{output_gramtools_genotype}/{{sample}}.vcf.gz.csi',
+
+	threads: 10
+	resources:
+		mem_mb=10000
+
+	shell:
+		"""
+		gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --force
+		cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.out_vcf}
+		bcftools index {output.out_vcf}
+		"""

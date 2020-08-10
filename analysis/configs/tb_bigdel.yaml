@@ -1,0 +1,9 @@
+starting_prg:
+  fasta_ref: "analysis/input_data/mtuberculosis/ref_genome/H37Rv.fasta"
+  prg: "analysis/outputs/make_prgs/tb_bigdel/prg_mn5_mml7"
+
+kmer_size: 10
+
+sample_tsv: "analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv"
+assemblies_dir: "analysis/input_data/mtuberculosis/pacb_ilmn/pacb_assemblies"
+ilmn_reads_dir: "analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_reads"
