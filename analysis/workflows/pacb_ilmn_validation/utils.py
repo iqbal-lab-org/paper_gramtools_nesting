@@ -15,6 +15,7 @@ def get_assembly(wildcards):
 def get_reads(wildcards) -> List[str]:
     reads_dir=f'{config["ilmn_reads_dir"]}/{wildcards.sample}'
     reads_files = glob(f'{reads_dir}/**/*.fastq.gz')
+    reads_files += glob(f'{reads_dir}/*.fastq.gz')
     if len(reads_files) == 0:
         raise FileNotFoundError(f"No reads files found in {reads_dir}")
     for read_file in reads_files:
