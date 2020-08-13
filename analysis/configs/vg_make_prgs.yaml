@@ -1,0 +1,6 @@
+prg_name: "tb_bigdel"
+genome_fasta: "analysis/input_data/mtuberculosis/ref_genome/H37Rv.fasta"
+
+# make_prgs workflow produces those
+full_bed: "analysis/outputs/make_prgs/tb_bigdel/beds/full.bed"
+msa_dir: "analysis/outputs/make_prgs/tb_bigdel/msas"
