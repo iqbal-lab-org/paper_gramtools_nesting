@@ -17,26 +17,34 @@ configfile: "analysis/configs/vg_make_prgs.yaml"
 #container: config["container"]
 
 include: "../common_utils.py"
+include: "../make_prgs/utils.py"
 
 # Paths
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/{config["prg_name"]}')
 output_prgs = output_base / "prgs"
+output_vcfs = output_base / "vcfs"
 
 mk_output_dirs(dir())
 
 # Get list of regions to build prgs of
 nonvar_regions, all_regions = [], []
+cs_var_regions = "" # For use by bcftools merge
 with open(config["full_bed"]) as f:
 	for line in f:
-		reg_name = line.split("\t")[3].strip() 
+		rows = line.split("\t")
+		reg_name = rows[3].strip() 
 		if reg_name.startswith("nonvar_"):
 			nonvar_regions.append(reg_name)
+		else:
+			cs_var_regions += f'{rows[0]}:{int(rows[1]) + 1}-{rows[2]},'
 		all_regions.append(reg_name)
 			
+vcfs = load_vcf_names(config["vcf_list"], config["prg_name"])
 
 rule all:
 	input:
-		f"{output_base}/prg.vg"
+		f"{output_base}/prg_msa.vg",
+		f"{output_base}/prg_vcf.vg",
 
 rule make_var_prgs:
 	input:
@@ -85,3 +93,31 @@ rule concat_prgs:
 	shell:
 		"vg concat {input} > {output}"
 
+rule make_input_vcf:
+	input:
+		vcfs=vcfs.values(),
+	output:
+		merged=f'{output_vcfs}/merged.vcf.gz',
+	params:
+		regions=cs_var_regions,
+	shadow:
+		"shallow"
+	shell:
+		"""
+		i=0
+		for in_vcf in {input.vcfs}; do
+		if [[ $i == 0 ]]; then bcftools view -r {params.regions} -Oz -o {output.merged} $in_vcf
+		else 
+			bcftools merge -r {params.regions} -Oz -o tmp.vcf.gz $in_vcf {output.merged}
+			mv tmp.vcf.gz {output.merged}
+		fi
+		"""
+
+rule prg_from_vcf:
+	input:
+		vcf=rules.make_input_vcf.output.merged,
+		ref_genome = config["genome_fasta"],
+	output:
+		f"{output_base}/prg_vcf.vg",
+	shell:
+		"vg construct -r {input.ref_genome} -v {input.vcf} -a > {output}"

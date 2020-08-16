@@ -11,9 +11,7 @@ def load_vcf_names(fname: str, prg_name: str) -> Dict:
     vcfs = dict()
     with open(fname) as fin:
         for line in fin:
-            fname = Path(config["vcf_prefix"]) / Path(
-                line.strip()
-            )
+            fname = Path(config["vcf_prefix"]) / Path(line.strip())
             if not fname.exists():
                 print(f"Error: required file {fname} not found")
                 exit(1)
