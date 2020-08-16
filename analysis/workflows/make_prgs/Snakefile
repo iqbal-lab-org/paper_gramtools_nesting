@@ -5,7 +5,7 @@ WORKFLOW = "make_prgs"
 configfile: "analysis/configs/common.yaml"
 #configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
 configfile: "analysis/configs/make_prgs/mtuberculosis.yaml"
-container: config["container"]
+#container: config["container"]
 
 include: "utils.py"
 

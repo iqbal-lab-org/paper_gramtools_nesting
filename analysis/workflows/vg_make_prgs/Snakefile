@@ -14,7 +14,7 @@ WORKFLOW = "vg_make_prgs"
 
 configfile: "analysis/configs/common.yaml"
 configfile: "analysis/configs/vg_make_prgs.yaml"
-container: config["container"]
+#container: config["container"]
 
 include: "../common_utils.py"
 
@@ -57,9 +57,13 @@ rule make_nonvar_prgs:
 		ref_genome = config["genome_fasta"],
 	output:
 		expand(f"{output_prgs}/{{region}}.vg", region = nonvar_regions),
+	params:
+		outdir=output_prgs,
+	shadow: 
+		"shallow"
 	shell:
 		"""
-		IFS="\n"; for nonvar_line in $(grep "^nonvar_" {input.full_bed}) 
+		IFS="\n"; for nonvar_line in $(grep -w "nonvar_.*" {input.full_bed}) 
 		do
 			IFS="\t"; elems=($nonvar_line)	
 			adj_start=$((${{elems[1]}} + 1))
@@ -67,8 +71,7 @@ rule make_nonvar_prgs:
 			reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
 			samtools faidx {input.ref_genome} $reg | \
 				sed 's/>.*/>ref/' > ref_portion.fa
-			vg construct -M ref_portion.fa > ${{prg_name}}.vg
-			rm ref_portion.fa
+			vg construct -M ref_portion.fa > {params.outdir}/${{prg_name}}.vg
 		done
 		"""
 

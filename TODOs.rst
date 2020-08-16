@@ -23,6 +23,4 @@ msps_dimorphism
 * Trees: could Add deduplication step when catting all fa sequences together. RAxML complains about duplicates in the msa otherwise. It does produce a deduplicated file as well by default, disabled using `--no-seq-check`.
 
 
-nestedness_simulations
-========================
 

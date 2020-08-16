@@ -10,5 +10,5 @@ echo -e "contig\tstart\tstop\tfound_in_samples" > $origin_ofile
 
 
 for fname in $files; do
-	gunzip -c $fname | awk '{if (length($4) > '$min_del_size' && length($5) == 1) {print $0}}' | grep '1/1' | grep 'PASS'| awk '{print $1"\t"$2"\t"$2 + length($4)"\t'$(basename ${fname%%.*})'"}'
+	gunzip -c $fname | awk '{if (length($4) > '$min_del_size' && length($5) == 1) {print $0}}' | grep '1/1' | grep 'PASS'| awk '{print $1"\t"$2 - 1"\t"$2 + length($4) - 1"\t'$(basename ${fname%%.*})'"}'
 	done | bedtools sort | bedtools merge -o distinct -c 4 | tee -a $origin_ofile | cut -f1-3 | awk '{l++;print $0"\tbigdel_"l}' > $ofile

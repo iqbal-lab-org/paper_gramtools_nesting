@@ -14,11 +14,13 @@ GMTOOLS_COMMIT = get_gmtools_commit()
 
 #_____Set up output paths______#
 output_gram_build = Path(f'{config["gram_builds_dir"]}/{WORKFLOW}/{GMTOOLS_COMMIT}')
+output_vg_build = Path(f'{config["vg_builds_dir"]}/{WORKFLOW}')
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
 output_base_commit = output_base / GMTOOLS_COMMIT
 
-vcf_outputs_dirs = ["gramtools_genotype"]
+vcf_outputs_dirs = ["gramtools_genotype", "vg_genotype"]
 output_gramtools_genotype = output_base_commit / vcf_outputs_dirs[0]
+output_vg_genotype = output_base_commit / vcf_outputs_dirs[1]
 
 mk_output_dirs(dir())
 
@@ -26,18 +28,19 @@ SAMPLES = get_samples(config["sample_tsv"])
 
 rule all:
 	input:
-		gram_vcfs=expand(f'{output_base_commit}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz', sample = SAMPLES)
+		gram_vcfs=expand(f'{output_base_commit}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz', sample = SAMPLES),
+		vg_vcfs=expand(f'{output_base_commit}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz', sample = SAMPLES)
 
 rule gram_build:
 	input:
-		prg=config["starting_prg"]["prg"],
+		prg=config["starting_prg"]["gram_prg"],
 		ref=config["starting_prg"]["fasta_ref"]
 		
 	output:
 		f'{output_gram_build}/cov_graph',
 
 	params:
-		k=config["kmer_size"],
+		k=config["starting_prg"]["gram_kmer_size"],
 		gram_dir=output_gram_build,
 
 	resources:
@@ -46,6 +49,30 @@ rule gram_build:
 	shell:
 		"""
 		gramtools build --prg {input.prg} --ref {input.ref} --kmer_size {params.k} --gram_dir {params.gram_dir} --force
+		"""
+
+rule vg_build:
+	input:
+		vg_graph=config["starting_prg"]["vg_prg"]
+	output:
+		xg=f'{output_vg_build / "prg.xg"}',
+		gcsa=f'{output_vg_build / "prg.gcsa"}',
+		snarls=f'{output_vg_build / "prg.snarls"}',
+	params:
+		k=config["starting_prg"]["vg_kmer_size"],
+	shadow:
+		"shallow"
+	resources:
+		mem_mb=25000
+	threads:
+		10
+	shell:
+		"""
+		vg index -k {params.k} -x {output.xg} {input.vg_graph}
+		vg prune -r -t {threads} {input.vg_graph} > pruned.vg
+		vg index -X 3 -k {params.k} -g {output.gcsa} -p -t {threads} pruned.vg
+		vg snarls {output.xg} > {output.snarls}
+		#vg deconstruct -p ref -e {input.vg_graph} {input.vg_graph} > {{output.vcf}}
 		"""
 
 rule gramtools_genotype:
@@ -68,4 +95,29 @@ rule gramtools_genotype:
 		gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --force
 		cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.out_vcf}
 		bcftools index {output.out_vcf}
+		"""
+
+rule vg_genotype:
+	input:
+		xg=rules.vg_build.output.xg,
+		gcsa=rules.vg_build.output.gcsa,
+		snarls=rules.vg_build.output.snarls,
+		reads_files=get_reads
+	output:
+		vcf=f'{output_base_commit}/{vcf_outputs_dirs[1]}/{{sample}}.vcf',
+		gzipped_vcf=f'{output_base_commit}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz',
+		bcftools_index=f'{output_vg_genotype}/{{sample}}.vcf.gz.csi',
+		mapped_gam=f'{output_vg_genotype}/mapped_{{sample}}.gam',
+		mapped_packed=f'{output_vg_genotype}/mapped_{{sample}}.pack',
+	threads: 10
+	resources:
+		mem_mb=10000
+	shell:
+		"""
+		rfilecmd=""
+		for rfile in {input.reads_files}; do rfilecmd="$rfilecmd -f $rfile"; done
+		vg map -x {input.xg} -g {input.gcsa} $rfilecmd -t {threads} > {output.mapped_gam}
+		vg pack -x {input.xg} -g {output.mapped_gam} -Q 5 -o {output.mapped_packed}
+		vg call {input.xg} -k {output.mapped_packed} --ploidy 1 > {output.vcf}
+		bgzip {output.vcf} && bcftools index {output.gzipped_vcf}
 		"""
