@@ -17,6 +17,7 @@ output_gram_build = Path(f'{config["gram_builds_dir"]}/{WORKFLOW}/{GMTOOLS_COMMI
 output_vg_build = Path(f'{config["vg_builds_dir"]}/{WORKFLOW}')
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
 output_base_commit = output_base / GMTOOLS_COMMIT
+output_mapped = output_base_commit / "mapped_reads"
 
 vcf_outputs_dirs = ["gramtools_genotype", "vg_genotype"]
 output_gramtools_genotype = output_base_commit / vcf_outputs_dirs[0]
@@ -28,8 +29,7 @@ SAMPLES = get_samples(config["sample_tsv"])
 
 rule all:
 	input:
-		gram_vcfs=expand(f'{output_base_commit}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz', sample = SAMPLES),
-		vg_vcfs=expand(f'{output_base_commit}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz', sample = SAMPLES)
+		expand(f'{output_base_commit}/{{condition}}_merged.vcf.gz', condition = vcf_outputs_dirs)
 
 rule gram_build:
 	input:
@@ -68,9 +68,9 @@ rule vg_build:
 		10
 	shell:
 		"""
-		vg index -k {params.k} -x {output.xg} {input.vg_graph}
+		vg index -k {params.k} -x {output.xg} -L {input.vg_graph} 
 		vg prune -r -t {threads} {input.vg_graph} > pruned.vg
-		vg index -X 3 -k {params.k} -g {output.gcsa} -p -t {threads} pruned.vg
+		vg index -L -X 3 -k {params.k} -g {output.gcsa} -p -t {threads} pruned.vg
 		vg snarls {output.xg} > {output.snarls}
 		#vg deconstruct -p ref -e {input.vg_graph} {input.vg_graph} > {{output.vcf}}
 		"""
@@ -97,27 +97,49 @@ rule gramtools_genotype:
 		bcftools index {output.out_vcf}
 		"""
 
-rule vg_genotype:
+rule vg_map:
 	input:
 		xg=rules.vg_build.output.xg,
 		gcsa=rules.vg_build.output.gcsa,
-		snarls=rules.vg_build.output.snarls,
-		reads_files=get_reads
+		reads_files=get_reads,
 	output:
-		vcf=f'{output_base_commit}/{vcf_outputs_dirs[1]}/{{sample}}.vcf',
-		gzipped_vcf=f'{output_base_commit}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz',
-		bcftools_index=f'{output_vg_genotype}/{{sample}}.vcf.gz.csi',
-		mapped_gam=f'{output_vg_genotype}/mapped_{{sample}}.gam',
-		mapped_packed=f'{output_vg_genotype}/mapped_{{sample}}.pack',
+		mapped_packed=f'{output_mapped}/mapped_{{sample}}.pack',
+	params:
+		mapped_gam=f'{output_mapped}/mapped_{{sample}}.gam',
 	threads: 10
 	resources:
 		mem_mb=10000
+	shadow:
+		"shallow"
 	shell:
 		"""
 		rfilecmd=""
 		for rfile in {input.reads_files}; do rfilecmd="$rfilecmd -f $rfile"; done
-		vg map -x {input.xg} -g {input.gcsa} $rfilecmd -t {threads} > {output.mapped_gam}
-		vg pack -x {input.xg} -g {output.mapped_gam} -Q 5 -o {output.mapped_packed}
-		vg call {input.xg} -k {output.mapped_packed} --ploidy 1 > {output.vcf}
-		bgzip {output.vcf} && bcftools index {output.gzipped_vcf}
+		vg map -x {input.xg} -g {input.gcsa} $rfilecmd -t {threads} > {params.mapped_gam}
+		vg pack -x {input.xg} -g {params.mapped_gam} -Q 5 -o {output.mapped_packed}
 		"""
+
+rule vg_genotype:
+	input:
+		xg=rules.vg_build.output.xg,
+		mapped=rules.vg_map.output.mapped_packed,
+		snarls=rules.vg_build.output.snarls,
+		vcf_to_genotype=config["vg_vcf_to_genotype"]
+	output:
+		gzipped=f'{output_base_commit}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz',
+		indexed=f'{output_vg_genotype}/{{sample}}.vcf.gz.csi',
+	params:
+		vcf=f'{output_vg_genotype}/{{sample}}.vcf',
+	shell:
+		"""
+		vg call {input.xg} -k {input.mapped} -v {input.vcf_to_genotype} -r {input.snarls} -s {wildcards.sample} --ploidy 1 > {params.vcf}
+		bgzip {params.vcf} && bcftools index {output.gzipped}
+		"""
+
+rule merge_vcfs:
+	input:
+		vcfs=expand(f'{output_base_commit}/{{condition}}/{{sample}}.vcf.gz', sample = SAMPLES, allow_missing=True),
+	output:
+		f'{output_base_commit}/{{condition}}_merged.vcf.gz'
+	shell:
+		"bcftools merge {input.vcfs} -m all -Oz -o {output}"

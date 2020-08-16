@@ -97,7 +97,7 @@ rule make_input_vcf:
 		ref_genome = config["genome_fasta"],
 	output:
 		merged=f'{output_vcfs}/merged.vcf.gz',
-		index=f'{output_vcfs}/merged.vcf.gz.csi',
+		indexes=expand(f'{output_vcfs}/merged.vcf.gz.{{suffix}}',suffix=["csi","tbi"]),
 	params:
 		regions=cs_var_regions,
 	shadow:
@@ -107,6 +107,7 @@ rule make_input_vcf:
 		bcftools merge -f PASS -r {params.regions} -Oz -o tmp.vcf.gz -l {input.vcf_fofn}
 		bcftools norm -c x -f {input.ref_genome} -Oz -o {output.merged} tmp.vcf.gz
 		bcftools index {output.merged}
+		tabix {output.merged} # required for `vg call -v`
 		"""
 
 rule prg_from_vcf:

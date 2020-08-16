@@ -2,10 +2,11 @@ starting_prg:
   fasta_ref: "analysis/input_data/mtuberculosis/ref_genome/H37Rv.fasta"
   gram_prg: "analysis/outputs/make_prgs/tb_bigdel/prg_mn5_mml7"
   gram_kmer_size: 10
-  vg_prg: "analysis/outputs/vg_make_prgs/tb_bigdel/prg.vg"
+  vg_prg: "analysis/outputs/vg_make_prgs/tb_bigdel/prg_vcf.vg"
   vg_kmer_size: 10
 
 vg_builds_dir: "analysis/outputs/vg_builds"
+vg_vcf_to_genotype: "analysis/outputs/vg_make_prgs/tb_bigdel/vcfs/merged.vcf.gz"
 
 
 sample_tsv: "analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv"

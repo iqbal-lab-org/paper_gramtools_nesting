@@ -45,7 +45,7 @@ def get_one_sample(sample_name, run_ids):
 
 
 
-with open("illumina_run_ids.tsv") as f:
+with open("./ilmn_run_ids.tsv") as f:
     reader = csv.DictReader(f, delimiter="\t")
     for d in reader:
         runs = d["runs"].split(",")
