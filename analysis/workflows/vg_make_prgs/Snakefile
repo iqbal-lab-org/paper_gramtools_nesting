@@ -17,7 +17,6 @@ configfile: "analysis/configs/vg_make_prgs.yaml"
 #container: config["container"]
 
 include: "../common_utils.py"
-include: "../make_prgs/utils.py"
 
 # Paths
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/{config["prg_name"]}')
@@ -39,7 +38,6 @@ with open(config["full_bed"]) as f:
 			cs_var_regions += f'{rows[0]}:{int(rows[1]) + 1}-{rows[2]},'
 		all_regions.append(reg_name)
 			
-vcfs = load_vcf_names(config["vcf_list"], config["prg_name"])
 
 rule all:
 	input:
@@ -87,7 +85,7 @@ rule concat_prgs:
 	input:
 		expand(f"{output_prgs}/{{region}}.vg", region = all_regions),
 	output:
-		f"{output_base}/prg.vg"
+		f"{output_base}/prg_msa.vg"
 	resources:
 		mem_mb=5000
 	shell:
@@ -95,22 +93,20 @@ rule concat_prgs:
 
 rule make_input_vcf:
 	input:
-		vcfs=vcfs.values(),
+		vcf_fofn=config["vcf_list"],
+		ref_genome = config["genome_fasta"],
 	output:
 		merged=f'{output_vcfs}/merged.vcf.gz',
+		index=f'{output_vcfs}/merged.vcf.gz.csi',
 	params:
 		regions=cs_var_regions,
 	shadow:
 		"shallow"
 	shell:
 		"""
-		i=0
-		for in_vcf in {input.vcfs}; do
-		if [[ $i == 0 ]]; then bcftools view -r {params.regions} -Oz -o {output.merged} $in_vcf
-		else 
-			bcftools merge -r {params.regions} -Oz -o tmp.vcf.gz $in_vcf {output.merged}
-			mv tmp.vcf.gz {output.merged}
-		fi
+		bcftools merge -f PASS -r {params.regions} -Oz -o tmp.vcf.gz -l {input.vcf_fofn}
+		bcftools norm -c x -f {input.ref_genome} -Oz -o {output.merged} tmp.vcf.gz
+		bcftools index {output.merged}
 		"""
 
 rule prg_from_vcf:
@@ -119,5 +115,7 @@ rule prg_from_vcf:
 		ref_genome = config["genome_fasta"],
 	output:
 		f"{output_base}/prg_vcf.vg",
+	resources:
+		mem_mb=5000
 	shell:
 		"vg construct -r {input.ref_genome} -v {input.vcf} -a > {output}"
