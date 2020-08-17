@@ -4,62 +4,12 @@ look for those deletions in those samples in a multi-sample vcf.
 
 Output: a tsv describing the deletions and if they are found in each sample.
 """
-from typing import List
 from pathlib import Path
 
 import click
 from pysam import VariantFile
 
-
-class Deletion:
-    def __init__(self, start: int, stop: int, del_len: int, samples: set):
-        self.start = start
-        self.stop = stop
-        self.del_len = del_len
-        self.samples = samples
-
-    def modify_by(self, left_delta: int, right_delta: int):
-        self.start += left_delta
-        self.stop += right_delta
-
-    def _contains(self, position: int):
-        return self.start <= position <= self.stop
-
-    def spans(self, other: "Deletion"):
-        return self._contains(other.start) and self._contains(other.stop)
-
-    def compatible_with(self, other: "Deletion"):
-        return self._contains(other.start) or self._contains(other.stop)
-
-    def __len__(self) -> int:
-        return self.stop - self.start + 1
-
-    def __lt__(self, other: "Deletion") -> bool:
-        return self.start < other.start
-
-    def __eq__(self, other: "Deletion") -> bool:
-        return self.start == other.start and self.stop == other.stop
-
-    def __repr__(self):
-        return f"[{self.start}, {self.stop}]: {self.samples}"
-
-
-Deletions = List[Deletion]
-
-
-def load_input_dels(input_dels_bed) -> Deletions:
-    input_dels: Deletions = list()
-    with Path(input_dels_bed).open() as f:
-        for i, line in enumerate(f):
-            if i == 0:
-                continue
-            rows = line.split("\t")
-            samples = set(rows[3].strip().split(","))
-            start, stop = int(rows[1]) + 1, int(rows[2])  # +1 : bed start is 0-based
-            del_len = stop - start  # That's how I picked them: len(alt) == 1
-            input_dels.append(Deletion(start, stop, del_len, samples))
-
-    return input_dels
+from tb_bigdel.common import Deletion, Deletions, load_input_dels
 
 
 def load_gtyped_dels(called_vcf) -> Deletions:
@@ -100,13 +50,16 @@ def main(called_vcf: click.Path, input_dels_bed: click.Path, output_file: str):
     for input_del in input_dels:
         found_dels = []
         for gtyped_del in gtyped_dels:
-            if gtyped_del.compatible_with(input_del):
+            if gtyped_del.overlaps(input_del):
                 found_dels.append(gtyped_del)
         if len(found_dels) > 1:
-            raise ValueError(
-                f"input del {input_del} found in >1 separate records: {found_dels}"
+            print(
+                f"WARNING: input del {input_del} found in >1 separate records: {found_dels}"
             )
-        found_del = found_dels[0] if len(found_dels) == 1 else None
+        found_del = found_dels[0] if len(found_dels) > 0 else None
+        found_samples = set()
+        for found in found_dels:
+            found_samples.update(found.samples)
         if found_del is not None:
             delta_len = input_del.del_len - found_del.del_len
             delta_pos = input_del.start - found_del.start
@@ -114,7 +67,7 @@ def main(called_vcf: click.Path, input_dels_bed: click.Path, output_file: str):
             line = f"{input_del.start}\t{input_del.del_len}\t{sample}\t"
             if found_del is None:
                 line += "0\t.\t.\n"
-            elif sample not in found_del.samples:
+            elif sample not in found_samples:
                 line += f"0\t{delta_len}\t{delta_pos}\n"
             else:
                 line += f"1\t{delta_len}\t{delta_pos}\n"

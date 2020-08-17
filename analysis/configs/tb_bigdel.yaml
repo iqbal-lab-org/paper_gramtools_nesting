@@ -3,12 +3,14 @@ starting_prg:
   gram_prg: "analysis/outputs/make_prgs/tb_bigdel/prg_mn5_mml7"
   gram_kmer_size: 10
   vg_prg: "analysis/outputs/vg_make_prgs/tb_bigdel/prg_vcf.vg"
-  vg_kmer_size: 10
+  vg_kmer_size: 16 
+  vg_doubling_steps: 4
 
 vg_builds_dir: "analysis/outputs/vg_builds"
-vg_vcf_to_genotype: "analysis/outputs/vg_make_prgs/tb_bigdel/vcfs/merged.vcf.gz"
+vcf_to_genotype: "analysis/outputs/vg_make_prgs/tb_bigdel/vcfs/merged.vcf.gz"
 
 
+input_regions: "analysis/input_data/make_prgs/beds/tb_bigdel.bed.origin"
 sample_tsv: "analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv"
 assemblies_dir: "analysis/input_data/mtuberculosis/pacb_ilmn/pacb_assemblies"
 ilmn_reads_dir: "analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_reads"

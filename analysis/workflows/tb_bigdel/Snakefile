@@ -1,5 +1,12 @@
 """
-The workflow has some rules similar/identical to pacb_ilmn_validation workflow, but is kept distinct as it does not assess gramtools perf against other standard var callers, but against genome graph tool(s).
+This workflow takes bed files listing regions + where they occur, a ref genome, a list of matched sample reads and pacbio assemblies and initial prgs to start from and runs:
+	- validate input variant regions are present in truth assemblies
+	- {vg, gramtools} prg index building
+	- {vg, gramtools} mapping/genotyping
+	- vcf merging per condition + validate input var regions present in called samples
+	- edit distance of called regions to truth assemblies
+
+The workflow has some rules similar/identical to pacb_ilmn_validation workflow, but is kept distinct as it does not assess gramtools perf against other standard var callers, but against other genome graph tool(s).
 """
 WORKFLOW = 'tb_bigdel'
 
@@ -16,12 +23,14 @@ GMTOOLS_COMMIT = get_gmtools_commit()
 output_gram_build = Path(f'{config["gram_builds_dir"]}/{WORKFLOW}/{GMTOOLS_COMMIT}')
 output_vg_build = Path(f'{config["vg_builds_dir"]}/{WORKFLOW}')
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
-output_base_commit = output_base / GMTOOLS_COMMIT
-output_mapped = output_base_commit / "mapped_reads"
+output_bowtie_indexes = output_base / "bowtie_indexes"
+output_regions = output_base / "input_regions"
+output_minimap2 = output_regions / "minimap2"
+output_genotyped = output_base / "genotyped"
 
-vcf_outputs_dirs = ["gramtools_genotype", "vg_genotype"]
-output_gramtools_genotype = output_base_commit / vcf_outputs_dirs[0]
-output_vg_genotype = output_base_commit / vcf_outputs_dirs[1]
+conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg"]
+output_gmtools = output_genotyped / conditions[0]
+output_vg_mapped = output_genotyped / conditions[1] / "mapped_reads"
 
 mk_output_dirs(dir())
 
@@ -29,7 +38,34 @@ SAMPLES = get_samples(config["sample_tsv"])
 
 rule all:
 	input:
-		expand(f'{output_base_commit}/{{condition}}_merged.vcf.gz', condition = vcf_outputs_dirs)
+		expand(f'{output_genotyped}/{{condition}}_merged.vcf.gz', condition = conditions),
+		expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}',ext=bowtie2_idx_extensions, sample=SAMPLES),
+		f'{output_regions}/all_vars.txt'
+
+rule index_pacb_assemblies:
+	input:
+		assembly=get_assembly
+	output:
+		expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}',ext=bowtie2_idx_extensions, allow_missing=True),
+	shell:
+		f"bowtie2-build {{input.assembly[0]}} {output_bowtie_indexes}/{{wildcards.sample}}"
+
+rule minimap2_call:
+	input:
+		assembly=get_assembly,
+		ref=config["starting_prg"]["fasta_ref"]
+	output:
+		f'{output_minimap2}/{{sample}}_vars.txt',
+	shell:
+		"""
+		minimap2 -c --cs {input.ref} {input.assembly} | sort -k6,6n -k8,8n | paftools.js call -l50 -L50 -f {input.ref} > {output}
+		"""
+
+rule validate_input_regions:
+	input:
+		expand(f'{output_minimap2}/{{sample}}_vars.txt',sample=SAMPLES),
+	output:
+		f'{output_regions}/all_vars.txt'
 
 rule gram_build:
 	input:
@@ -60,6 +96,7 @@ rule vg_build:
 		snarls=f'{output_vg_build / "prg.snarls"}',
 	params:
 		k=config["starting_prg"]["vg_kmer_size"],
+		X=config["starting_prg"]["vg_doubling_steps"],
 	shadow:
 		"shallow"
 	resources:
@@ -70,7 +107,7 @@ rule vg_build:
 		"""
 		vg index -k {params.k} -x {output.xg} -L {input.vg_graph} 
 		vg prune -r -t {threads} {input.vg_graph} > pruned.vg
-		vg index -L -X 3 -k {params.k} -g {output.gcsa} -p -t {threads} pruned.vg
+		vg index -L -X {params.X} -k {params.k} -g {output.gcsa} -p -t {threads} pruned.vg
 		vg snarls {output.xg} > {output.snarls}
 		#vg deconstruct -p ref -e {input.vg_graph} {input.vg_graph} > {{output.vcf}}
 		"""
@@ -82,9 +119,9 @@ rule gramtools_genotype:
 		reads_files=get_reads
 
 	output:
-		sample_geno_dir=directory(f'{output_gramtools_genotype}/{{sample}}'),
-		out_vcf=f'{output_base_commit}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz',
-		bcftools_index=f'{output_gramtools_genotype}/{{sample}}.vcf.gz.csi',
+		sample_geno_dir=directory(f'{output_genotyped}/{conditions[0]}/{{sample}}'),
+		gzipped=f'{output_genotyped}/{conditions[0]}/{{sample}}.vcf.gz',
+		indexed=f'{output_genotyped}/{conditions[0]}/{{sample}}.vcf.gz.csi',
 
 	threads: 10
 	resources:
@@ -93,8 +130,8 @@ rule gramtools_genotype:
 	shell:
 		"""
 		gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --force
-		cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.out_vcf}
-		bcftools index {output.out_vcf}
+		cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.gzipped}
+		bcftools index {output.gzipped}
 		"""
 
 rule vg_map:
@@ -103,9 +140,9 @@ rule vg_map:
 		gcsa=rules.vg_build.output.gcsa,
 		reads_files=get_reads,
 	output:
-		mapped_packed=f'{output_mapped}/mapped_{{sample}}.pack',
+		mapped_packed=f'{output_vg_mapped}/mapped_{{sample}}.pack',
 	params:
-		mapped_gam=f'{output_mapped}/mapped_{{sample}}.gam',
+		mapped_gam=f'{output_vg_mapped}/mapped_{{sample}}.gam',
 	threads: 10
 	resources:
 		mem_mb=10000
@@ -124,12 +161,12 @@ rule vg_genotype:
 		xg=rules.vg_build.output.xg,
 		mapped=rules.vg_map.output.mapped_packed,
 		snarls=rules.vg_build.output.snarls,
-		vcf_to_genotype=config["vg_vcf_to_genotype"]
+		vcf_to_genotype=config["vcf_to_genotype"]
 	output:
-		gzipped=f'{output_base_commit}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz',
-		indexed=f'{output_vg_genotype}/{{sample}}.vcf.gz.csi',
+		gzipped=f'{output_genotyped}/{conditions[1]}/{{sample}}.vcf.gz',
+		indexed=f'{output_genotyped}/{conditions[1]}/{{sample}}.vcf.gz.csi',
 	params:
-		vcf=f'{output_vg_genotype}/{{sample}}.vcf',
+		vcf=f'{output_genotyped}/{conditions[1]}/{{sample}}.vcf',
 	shell:
 		"""
 		vg call {input.xg} -k {input.mapped} -v {input.vcf_to_genotype} -r {input.snarls} -s {wildcards.sample} --ploidy 1 > {params.vcf}
@@ -138,8 +175,8 @@ rule vg_genotype:
 
 rule merge_vcfs:
 	input:
-		vcfs=expand(f'{output_base_commit}/{{condition}}/{{sample}}.vcf.gz', sample = SAMPLES, allow_missing=True),
+		vcfs=expand(f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz', sample = SAMPLES, allow_missing=True),
 	output:
-		f'{output_base_commit}/{{condition}}_merged.vcf.gz'
+		f'{output_genotyped}/{{condition}}_merged.vcf.gz'
 	shell:
 		"bcftools merge {input.vcfs} -m all -Oz -o {output}"
