@@ -63,7 +63,7 @@ def main(called_vcf: click.Path, input_dels_bed: click.Path, output_file: str):
         if found_del is not None:
             delta_len = input_del.del_len - found_del.del_len
             delta_pos = input_del.start - found_del.start
-        for sample in input_del.samples:
+        for sample in sorted(input_del.samples):
             line = f"{input_del.start}\t{input_del.del_len}\t{sample}\t"
             if found_del is None:
                 line += "0\t.\t.\n"
