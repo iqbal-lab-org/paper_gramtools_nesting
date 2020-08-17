@@ -40,7 +40,7 @@ rule all:
 	input:
 		expand(f'{output_genotyped}/{{condition}}_merged.vcf.gz', condition = conditions),
 		expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}',ext=bowtie2_idx_extensions, sample=SAMPLES),
-		f'{output_regions}/all_vars.txt'
+		f'{output_regions}/all_vars.vcf.gz'
 
 rule index_pacb_assemblies:
 	input:
@@ -55,17 +55,23 @@ rule minimap2_call:
 		assembly=get_assembly,
 		ref=config["starting_prg"]["fasta_ref"]
 	output:
-		f'{output_minimap2}/{{sample}}_vars.txt',
+		gzipped=f'{output_minimap2}/{{sample}}_vars.vcf.gz',
+		indexed=f'{output_minimap2}/{{sample}}_vars.vcf.gz.csi',
+	params:
+		vcf=f'{output_minimap2}/{{sample}}_vars.vcf',
 	shell:
 		"""
-		minimap2 -c --cs {input.ref} {input.assembly} | sort -k6,6n -k8,8n | paftools.js call -l50 -L50 -f {input.ref} > {output}
+		minimap2 -c --cs {input.ref} {input.assembly} | sort -k6,6n -k8,8n | paftools.js call -l50 -L50 -f {input.ref} -s {wildcards.sample} - > {params.vcf}
+		bgzip {params.vcf} && bcftools index {output.gzipped}
 		"""
 
 rule validate_input_regions:
 	input:
-		expand(f'{output_minimap2}/{{sample}}_vars.txt',sample=SAMPLES),
+		expand(f'{output_minimap2}/{{sample}}_vars.vcf.gz',sample=SAMPLES),
 	output:
-		f'{output_regions}/all_vars.txt'
+		f'{output_regions}/all_vars.vcf.gz'
+	shell:
+		"bcftools merge {input} -Oz -o {output}"
 
 rule gram_build:
 	input:
