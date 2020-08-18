@@ -47,6 +47,15 @@ def main(called_vcf: click.Path, input_dels_bed: click.Path, output_file: str):
     gtyped_dels: Deletions = load_gtyped_dels(called_vcf)
 
     fout = open(output_file, "w")
+    header = [
+        "deletion_start",
+        "deletion_len",
+        "sample",
+        "delta_len(this_del-recovered_del)",
+        "delta_pos(this_pos-recovered_pos)",
+    ]
+    fout.write("\t".join(header) + "\n")
+
     for input_del in input_dels:
         found_dels = []
         for gtyped_del in gtyped_dels:
@@ -56,21 +65,25 @@ def main(called_vcf: click.Path, input_dels_bed: click.Path, output_file: str):
             print(
                 f"WARNING: input del {input_del} found in >1 separate records: {found_dels}"
             )
-        found_del = found_dels[0] if len(found_dels) > 0 else None
+
         found_samples = set()
         for found in found_dels:
             found_samples.update(found.samples)
-        if found_del is not None:
-            delta_len = input_del.del_len - found_del.del_len
-            delta_pos = input_del.start - found_del.start
+
+        if len(found_dels) == 0:
+            delta_len = "."
+            delta_pos = "."
+        elif len(found_dels) == 1:
+            delta_len = input_del.del_len - found_dels[0].del_len
+            delta_pos = input_del.start - found_dels[0].start
+        else:
+            delta_len = "MULTI"
+            delta_pos = "MULTI"
+
         for sample in sorted(input_del.samples):
+            found = 1 if sample in found_samples else 0
             line = f"{input_del.start}\t{input_del.del_len}\t{sample}\t"
-            if found_del is None:
-                line += "0\t.\t.\n"
-            elif sample not in found_samples:
-                line += f"0\t{delta_len}\t{delta_pos}\n"
-            else:
-                line += f"1\t{delta_len}\t{delta_pos}\n"
+            line += f"{found}\t{delta_len}\t{delta_pos}\n"
             fout.write(line)
 
     fout.close()

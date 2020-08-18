@@ -38,9 +38,9 @@ SAMPLES = get_samples(config["sample_tsv"])
 
 rule all:
 	input:
-		expand(f'{output_genotyped}/{{condition}}_merged.vcf.gz', condition = conditions),
+		expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions, ftype=["merged.vcf.gz", "validated.tsv"]),
 		expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}',ext=bowtie2_idx_extensions, sample=SAMPLES),
-		f'{output_regions}/all_vars.vcf.gz'
+		f'{output_regions}/minimap2_validated.tsv'
 
 rule index_pacb_assemblies:
 	input:
@@ -67,11 +67,18 @@ rule minimap2_call:
 
 rule validate_input_regions:
 	input:
-		expand(f'{output_minimap2}/{{sample}}_vars.vcf.gz',sample=SAMPLES),
+		vcfs=expand(f'{output_minimap2}/{{sample}}_vars.vcf.gz',sample=SAMPLES),
+		input_regions=config["input_regions"],
 	output:
-		f'{output_regions}/all_vars.vcf.gz'
+		vcf=f'{output_regions}/minimap2_vars.vcf.gz',
+		tsv=f'{output_regions}/minimap2_validated.tsv',
+	params:
+		validation_script=f'{config["scripts"]}/{WORKFLOW}/find_input_dels.py'
 	shell:
-		"bcftools merge {input} -Oz -o {output}"
+		"""
+		bcftools merge {input.vcfs} -Oz -o {output.vcf}
+		python3 {params.validation_script} {output.vcf} {input.input_regions} {output.tsv}
+		"""
 
 rule gram_build:
 	input:
@@ -179,10 +186,15 @@ rule vg_genotype:
 		bgzip {params.vcf} && bcftools index {output.gzipped}
 		"""
 
-rule merge_vcfs:
+rule merge_and_assess_vcfs:
 	input:
 		vcfs=expand(f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz', sample = SAMPLES, allow_missing=True),
+		input_regions=config["input_regions"],
 	output:
-		f'{output_genotyped}/{{condition}}_merged.vcf.gz'
+		vcf=f'{output_genotyped}/{{condition}}_merged.vcf.gz',
+		tsv=f'{output_genotyped}/{{condition}}_validated.tsv',
+	params:
+		validation_script=f'{config["scripts"]}/{WORKFLOW}/find_input_dels.py'
 	shell:
-		"bcftools merge {input.vcfs} -m all -Oz -o {output}"
+		"bcftools merge {input.vcfs} -m all -Oz -o {output.vcf};"
+		"python3 {params.validation_script} {output.vcf} {input.input_regions} {output.tsv}"
