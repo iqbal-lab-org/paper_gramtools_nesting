@@ -74,7 +74,7 @@ rule minimap2_call:
 rule validate_input_regions:
 	input:
 		vcfs=expand(f'{output_minimap2}/{{sample}}_vars.vcf.gz',sample=SAMPLES),
-		input_regions=config["regions_origin"],
+		input_regions=config["beds"]["with_origin"],
 	output:
 		vcf=f'{output_regions}/minimap2_vars.vcf.gz',
 		tsv=f'{output_regions}/minimap2_validated.tsv',
@@ -196,7 +196,7 @@ rule vg_genotype:
 rule merge_and_assess_vcfs:
 	input:
 		vcfs=expand(f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz', sample = SAMPLES, allow_missing=True),
-		input_regions=config["regions_origin"],
+		input_regions=config["beds"]["with_origin"],
 	output:
 		vcf=f'{output_genotyped}/{{condition}}_merged.vcf.gz',
 		tsv=f'{output_genotyped}/{{condition}}_validated.tsv',
@@ -208,7 +208,7 @@ rule merge_and_assess_vcfs:
 
 rule describe_vcf_prg:
 	input:
-		input_regions=config["regions_origin"],
+		input_regions=config["beds"]["merged"],
 		vg_vcf=f'{output_genotyped}/{conditions[1]}_merged.vcf.gz',
 	output:
 		desc=f'{output_prg_desc}/{conditions[1]}_variants.tsv',
@@ -219,7 +219,7 @@ rule describe_vcf_prg:
 
 rule describe_jvcf_prg:
 	input:
-		input_regions=config["regions_origin"],
+		input_regions=config["beds"]["merged"],
 		gram_jvcf=f'{output_genotyped}/{conditions[0]}/{SAMPLES[0]}/genotype/genotyped.json',
 	output:
 		desc=f'{output_prg_desc}/{conditions[0]}_variants.tsv',
@@ -232,7 +232,7 @@ rule align_induced_gene_seqs_tb_bigdel:
 	input:
 		truth_ref_idx=expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}', ext=bowtie2_idx_extensions, allow_missing=True),
 		result_vcf=f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz',
-		var_regions=config["var_regions"],
+		var_regions=config["beds"]["with_flank"],
 		fasta_ref=config["starting_prg"]["fasta_ref"],
 	output:
 		alignment_file=f'{output_alignments}/{{condition}}_{{sample}}.sam',
@@ -250,7 +250,7 @@ rule align_induced_gene_seqs_tb_bigdel:
 			adjusted_start=$((${{elems[1]}} + 1))
 			reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
 			gene_name=${{elems[3]}}
-			samtools faidx {input.fasta_ref} $reg | bcftools consensus {input.result_vcf} |
+			samtools faidx {input.fasta_ref} $reg | bcftools consensus -s {wildcards.sample} {input.result_vcf} |
 				sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
 		done
 		bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}

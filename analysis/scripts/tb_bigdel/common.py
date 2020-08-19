@@ -54,9 +54,12 @@ def load_input_dels(input_dels_bed) -> Intervals:
     with Path(input_dels_bed).open() as f:
         for i, line in enumerate(f):
             rows = line.split("\t")
+            try:
+                start, stop = int(rows[1]) + 1, int(rows[2])  # +1 : bed start is 0-based
+                del_len = stop - start  # That's how I picked them: len(alt) == 1
+            except ValueError: # Skips header line
+                continue
             samples = set(rows[3].strip().split(","))
-            start, stop = int(rows[1]) + 1, int(rows[2])  # +1 : bed start is 0-based
-            del_len = stop - start  # That's how I picked them: len(alt) == 1
             input_dels.append(Interval(start, stop, samples, del_len))
 
     return input_dels
