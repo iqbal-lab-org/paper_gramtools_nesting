@@ -32,20 +32,22 @@ output_prg_desc = output_base / "prg_descriptions"
 output_alignments = output_base / "alignments"
 output_gene_portions = output_alignments / "gene_portions"
 
-conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg"]
+conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "baseline_ref"]
 output_gmtools = output_genotyped / conditions[0]
 output_vg_mapped = output_genotyped / conditions[1] / "mapped_reads"
+output_baseline_ref = output_genotyped / conditions[2]
 
 mk_output_dirs(dir())
 
 SAMPLES = get_samples(config["sample_tsv"])
 
+localrules: all, baseline_ref_genotype
+
 rule all:
 	input:
-		expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions, ftype=["merged.vcf.gz", "validated.tsv"]),
-		expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}',ext=bowtie2_idx_extensions, sample=SAMPLES),
-		f'{output_regions}/minimap2_validated.tsv',
-		variant_counts=expand(f'{output_prg_desc}/{{condition}}_variants.tsv',condition = conditions),
+		genotyped=expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions[0:2], ftype=["merged.vcf.gz", "validated.tsv"]),
+		validated=f'{output_regions}/minimap2_validated.tsv',
+		variant_counts=expand(f'{output_prg_desc}/{{condition}}_variants.tsv',condition = conditions[0:2]),
 		alignments=expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=conditions, sample=SAMPLES),
 
 rule index_pacb_assemblies:
@@ -193,6 +195,22 @@ rule vg_genotype:
 		bgzip {params.vcf} && bcftools index {output.gzipped}
 		"""
 
+rule baseline_ref_genotype:
+	"""Dummy rule producing empty vcfs used for baseline gene portion-assembly alignments"""
+	input:
+		vcf=config["vcf_template"]
+	output:
+		gzipped=temp(f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz'),
+		indexed=f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz.csi',
+	params:
+		vcf=f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf',
+	shell:
+		"""
+		cp {input.vcf} {params.vcf}
+		sed -i 's/sample/{wildcards.sample}/' {params.vcf}
+		bgzip {params.vcf} && bcftools index {output.gzipped}
+		"""
+
 rule merge_and_assess_vcfs:
 	input:
 		vcfs=expand(f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz', sample = SAMPLES, allow_missing=True),
@@ -206,6 +224,7 @@ rule merge_and_assess_vcfs:
 		"bcftools merge {input.vcfs} -m all -Oz -o {output.vcf};"
 		"python3 {params.validation_script} {output.vcf} {input.input_regions} {output.tsv}"
 
+
 rule describe_vcf_prg:
 	input:
 		input_regions=config["beds"]["merged"],
@@ -217,6 +236,7 @@ rule describe_vcf_prg:
 	shell:
 		"python3 {params.script} {input.vg_vcf} {input.input_regions} {output.desc}"	
 
+
 rule describe_jvcf_prg:
 	input:
 		input_regions=config["beds"]["merged"],
@@ -227,6 +247,7 @@ rule describe_jvcf_prg:
 		script=f'{config["scripts"]}/{WORKFLOW}/count_prg_variants.py',
 	shell:
 		"python3 {params.script} {input.gram_jvcf} {input.input_regions} {output.desc}"	
+
 
 rule align_induced_gene_seqs_tb_bigdel:
 	input:

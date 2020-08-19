@@ -9,6 +9,7 @@ starting_prg:
 vg_builds_dir: "analysis/outputs/vg_builds"
 vcf_to_genotype: "analysis/outputs/vg_make_prgs/tb_bigdel/vcfs/merged.vcf.gz"
 
+vcf_template: "analysis/input_data/vcf_template.vcf"
 
 beds:
         merged: "analysis/input_data/make_prgs/beds/tb_bigdel.bed"
