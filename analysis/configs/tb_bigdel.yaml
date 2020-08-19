@@ -10,7 +10,8 @@ vg_builds_dir: "analysis/outputs/vg_builds"
 vcf_to_genotype: "analysis/outputs/vg_make_prgs/tb_bigdel/vcfs/merged.vcf.gz"
 
 
-input_regions: "analysis/input_data/make_prgs/beds/tb_bigdel.bed.origin"
+var_regions: "analysis/outputs/make_prgs/tb_bigdel/beds/vars_300.bed"
+regions_origin: "analysis/input_data/make_prgs/beds/tb_bigdel.bed.origin"
 sample_tsv: "analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv"
 assemblies_dir: "analysis/input_data/mtuberculosis/pacb_ilmn/pacb_assemblies"
 ilmn_reads_dir: "analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_reads"

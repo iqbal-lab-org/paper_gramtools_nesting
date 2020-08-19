@@ -23,10 +23,14 @@ GMTOOLS_COMMIT = get_gmtools_commit()
 output_gram_build = Path(f'{config["gram_builds_dir"]}/{WORKFLOW}/{GMTOOLS_COMMIT}')
 output_vg_build = Path(f'{config["vg_builds_dir"]}/{WORKFLOW}')
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
+
 output_bowtie_indexes = output_base / "bowtie_indexes"
 output_regions = output_base / "input_regions"
 output_minimap2 = output_regions / "minimap2"
 output_genotyped = output_base / "genotyped"
+output_prg_desc = output_base / "prg_descriptions"
+output_alignments = output_base / "alignments"
+output_gene_portions = output_alignments / "gene_portions"
 
 conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg"]
 output_gmtools = output_genotyped / conditions[0]
@@ -40,7 +44,9 @@ rule all:
 	input:
 		expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions, ftype=["merged.vcf.gz", "validated.tsv"]),
 		expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}',ext=bowtie2_idx_extensions, sample=SAMPLES),
-		f'{output_regions}/minimap2_validated.tsv'
+		f'{output_regions}/minimap2_validated.tsv',
+		variant_counts=expand(f'{output_prg_desc}/{{condition}}_variants.tsv',condition = conditions),
+		alignments=expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=conditions, sample=SAMPLES),
 
 rule index_pacb_assemblies:
 	input:
@@ -68,7 +74,7 @@ rule minimap2_call:
 rule validate_input_regions:
 	input:
 		vcfs=expand(f'{output_minimap2}/{{sample}}_vars.vcf.gz',sample=SAMPLES),
-		input_regions=config["input_regions"],
+		input_regions=config["regions_origin"],
 	output:
 		vcf=f'{output_regions}/minimap2_vars.vcf.gz',
 		tsv=f'{output_regions}/minimap2_validated.tsv',
@@ -135,6 +141,7 @@ rule gramtools_genotype:
 		sample_geno_dir=directory(f'{output_genotyped}/{conditions[0]}/{{sample}}'),
 		gzipped=f'{output_genotyped}/{conditions[0]}/{{sample}}.vcf.gz',
 		indexed=f'{output_genotyped}/{conditions[0]}/{{sample}}.vcf.gz.csi',
+		jvcf=f'{output_genotyped}/{conditions[0]}/{{sample}}/genotype/genotyped.json',
 
 	threads: 10
 	resources:
@@ -189,7 +196,7 @@ rule vg_genotype:
 rule merge_and_assess_vcfs:
 	input:
 		vcfs=expand(f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz', sample = SAMPLES, allow_missing=True),
-		input_regions=config["input_regions"],
+		input_regions=config["regions_origin"],
 	output:
 		vcf=f'{output_genotyped}/{{condition}}_merged.vcf.gz',
 		tsv=f'{output_genotyped}/{{condition}}_validated.tsv',
@@ -198,3 +205,53 @@ rule merge_and_assess_vcfs:
 	shell:
 		"bcftools merge {input.vcfs} -m all -Oz -o {output.vcf};"
 		"python3 {params.validation_script} {output.vcf} {input.input_regions} {output.tsv}"
+
+rule describe_vcf_prg:
+	input:
+		input_regions=config["regions_origin"],
+		vg_vcf=f'{output_genotyped}/{conditions[1]}_merged.vcf.gz',
+	output:
+		desc=f'{output_prg_desc}/{conditions[1]}_variants.tsv',
+	params:
+		script=f'{config["scripts"]}/{WORKFLOW}/count_prg_variants.py',
+	shell:
+		"python3 {params.script} {input.vg_vcf} {input.input_regions} {output.desc}"	
+
+rule describe_jvcf_prg:
+	input:
+		input_regions=config["regions_origin"],
+		gram_jvcf=f'{output_genotyped}/{conditions[0]}/{SAMPLES[0]}/genotype/genotyped.json',
+	output:
+		desc=f'{output_prg_desc}/{conditions[0]}_variants.tsv',
+	params:
+		script=f'{config["scripts"]}/{WORKFLOW}/count_prg_variants.py',
+	shell:
+		"python3 {params.script} {input.gram_jvcf} {input.input_regions} {output.desc}"	
+
+rule align_induced_gene_seqs_tb_bigdel:
+	input:
+		truth_ref_idx=expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}', ext=bowtie2_idx_extensions, allow_missing=True),
+		result_vcf=f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz',
+		var_regions=config["var_regions"],
+		fasta_ref=config["starting_prg"]["fasta_ref"],
+	output:
+		alignment_file=f'{output_alignments}/{{condition}}_{{sample}}.sam',
+	params:
+		gene_portions=f'{output_gene_portions}/{{condition}}_{{sample}}.fa',
+		idx_prefix=f'{output_bowtie_indexes}/{{sample}}',
+	resources:
+		mem_mb=2000
+	shell:
+		"""
+		> {params.gene_portions}
+		IFS="\n"; for gene_line in $(cat {input.var_regions})
+		do
+			IFS="\t"; elems=($gene_line)	
+			adjusted_start=$((${{elems[1]}} + 1))
+			reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
+			gene_name=${{elems[3]}}
+			samtools faidx {input.fasta_ref} $reg | bcftools consensus {input.result_vcf} |
+				sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
+		done
+		bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
+		"""

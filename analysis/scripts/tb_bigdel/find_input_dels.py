@@ -9,11 +9,11 @@ from pathlib import Path
 import click
 from pysam import VariantFile
 
-from tb_bigdel.common import Deletion, Deletions, load_input_dels
+from tb_bigdel.common import Interval, Intervals, load_input_dels
 
 
-def load_gtyped_dels(called_vcf) -> Deletions:
-    gtyped_dels: Deletions = list()
+def load_gtyped_dels(called_vcf) -> Intervals:
+    gtyped_dels: Intervals = list()
     vcf_recs = VariantFile(called_vcf)
     for rec in vcf_recs.fetch():
         samples = set()
@@ -32,7 +32,7 @@ def load_gtyped_dels(called_vcf) -> Deletions:
         del_len = len(rec.ref) - min(map(len, bigdels))  # Take len of largest deletion
 
         gtyped_dels.append(
-            Deletion(rec.pos, rec.pos + len(rec.ref) - 1, del_len, samples)
+            Interval(rec.pos, rec.pos + len(rec.ref) - 1, samples, del_len)
         )
     return gtyped_dels
 
@@ -43,8 +43,8 @@ def load_gtyped_dels(called_vcf) -> Deletions:
 @click.argument("output_file", type=str)
 def main(called_vcf: click.Path, input_dels_bed: click.Path, output_file: str):
 
-    input_dels: Deletions = load_input_dels(input_dels_bed)
-    gtyped_dels: Deletions = load_gtyped_dels(called_vcf)
+    input_dels: Intervals = load_input_dels(input_dels_bed)
+    gtyped_dels: Intervals = load_gtyped_dels(called_vcf)
 
     fout = open(output_file, "w")
     header = [
