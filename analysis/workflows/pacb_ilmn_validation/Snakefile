@@ -286,8 +286,9 @@ rule process_and_plot_alignments:
 		f'{output_plots}/stats.tsv',
 		expand(f'{output_plots}/NM_{{gene}}.pdf', gene=GENES),
 	params:
-		processing_script=f'{config["scripts"]}/{WORKFLOW}/process_alignments.py'
+		script_dir=f'{config["scripts"]}/{WORKFLOW}'
 	shell:
-		f"python3 {{params.processing_script}} {output_alignments} {output_plots} {{input.var_regions}}"
+		f"python3 {{params.script_dir}}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots};"
+		f"python3 {{params.script_dir}}/plot_alignments.py {output_plots}/stats.tsv {output_plots};"
 
 	

@@ -9,12 +9,13 @@ This workflow takes bed files listing regions + where they occur, a ref genome, 
 The workflow has some rules similar/identical to pacb_ilmn_validation workflow, but is kept distinct as it does not assess gramtools perf against other standard var callers, but against other genome graph tool(s).
 """
 WORKFLOW = 'tb_bigdel'
+VALIDATION_WORKFLOW = 'pacb_ilmn_validation'
 
 configfile: "analysis/configs/common.yaml"
 configfile: f"analysis/configs/tb_bigdel.yaml"
 #container: config["container"]
 
-include: "../pacb_ilmn_validation/utils.py"
+include: f"../{VALIDATION_WORKFLOW}/utils.py"
 include: "../common_utils.py"
 
 GMTOOLS_COMMIT = get_gmtools_commit()
@@ -31,6 +32,7 @@ output_genotyped = output_base / "genotyped"
 output_prg_desc = output_base / "prg_descriptions"
 output_alignments = output_base / "alignments"
 output_gene_portions = output_alignments / "gene_portions"
+output_plots = output_base / "plots"
 
 conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "baseline_ref"]
 output_gmtools = output_genotyped / conditions[0]
@@ -48,7 +50,7 @@ rule all:
 		genotyped=expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions[0:2], ftype=["merged.vcf.gz", "validated.tsv"]),
 		validated=f'{output_regions}/minimap2_validated.tsv',
 		variant_counts=expand(f'{output_prg_desc}/{{condition}}_variants.tsv',condition = conditions[0:2]),
-		alignments=expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=conditions, sample=SAMPLES),
+		stats=f'{output_plots}/stats.tsv'
 
 rule index_pacb_assemblies:
 	input:
@@ -154,6 +156,8 @@ rule gramtools_genotype:
 		gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --force
 		cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.gzipped}
 		bcftools index {output.gzipped}
+		bcftools filter -i 'FT!="AMBIG"' {output.gzipped} -Oz -o tmp.vcf.gz
+		mv tmp.vcf.gz {output.gzipped} && bcftools index {output.gzipped}
 		"""
 
 rule vg_map:
@@ -275,4 +279,15 @@ rule align_induced_gene_seqs_tb_bigdel:
 				sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
 		done
 		bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
+		"""
+
+rule process_alignments:
+	input:
+		alignments=expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=conditions, sample=SAMPLES),
+		var_regions=config["beds"]["with_flank"],
+	output:
+		stats=f'{output_plots}/stats.tsv'
+	shell:
+		f"""
+		python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {{input.alignments}} {{input.var_regions}} {output_plots}
 		"""
