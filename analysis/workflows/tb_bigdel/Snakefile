@@ -15,6 +15,7 @@ configfile: "analysis/configs/common.yaml"
 configfile: f"analysis/configs/tb_bigdel.yaml"
 #container: config["container"]
 
+# Include convenience functions
 include: f"../{VALIDATION_WORKFLOW}/utils.py"
 include: "../common_utils.py"
 
@@ -31,19 +32,28 @@ output_minimap2 = output_regions / "minimap2"
 output_genotyped = output_base / "genotyped"
 output_prg_desc = output_base / "prg_descriptions"
 output_alignments = output_base / "alignments"
+output_ref_index = output_alignments / "ref_index"
+output_ref_alignments = output_alignments / "ilmn_alignments_ref"
 output_gene_portions = output_alignments / "gene_portions"
 output_plots = output_base / "plots"
 
-conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "baseline_ref"]
+# sed 's/<DEL:.*>/<DEL>/ '
+conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "baseline_ref","graphtyper2"]
 output_gmtools = output_genotyped / conditions[0]
 output_vg_mapped = output_genotyped / conditions[1] / "mapped_reads"
 output_baseline_ref = output_genotyped / conditions[2]
+output_graphtyper = output_genotyped / conditions[3]
 
 mk_output_dirs(dir())
 
 SAMPLES = get_samples(config["sample_tsv"])
+ref_name = Path(config["starting_prg"]["fasta_ref"]).stem
 
 localrules: all, baseline_ref_genotype
+
+# Include rule sets
+include: "validate_input_dels.smk"
+include: "genotype.smk"
 
 rule all:
 	input:
@@ -51,6 +61,7 @@ rule all:
 		validated=f'{output_regions}/minimap2_validated.tsv',
 		variant_counts=expand(f'{output_prg_desc}/{{condition}}_variants.tsv',condition = conditions[0:2]),
 		stats=f'{output_plots}/stats.tsv'
+
 
 rule index_pacb_assemblies:
 	input:
@@ -60,174 +71,29 @@ rule index_pacb_assemblies:
 	shell:
 		f"bowtie2-build {{input.assembly[0]}} {output_bowtie_indexes}/{{wildcards.sample}}"
 
-rule minimap2_call:
-	input:
-		assembly=get_assembly,
-		ref=config["starting_prg"]["fasta_ref"]
+
+rule index_reference:
 	output:
-		gzipped=f'{output_minimap2}/{{sample}}_vars.vcf.gz',
-		indexed=f'{output_minimap2}/{{sample}}_vars.vcf.gz.csi',
-	params:
-		vcf=f'{output_minimap2}/{{sample}}_vars.vcf',
+		ref_idx=expand(f'{output_ref_index}/{ref_name}.{{ext}}',ext=bowtie2_idx_extensions),
 	shell:
-		"""
-		minimap2 -c --cs {input.ref} {input.assembly} | sort -k6,6n -k8,8n | paftools.js call -l50 -L50 -f {input.ref} -s {wildcards.sample} - > {params.vcf}
-		bgzip {params.vcf} && bcftools index {output.gzipped}
-		"""
+		f'bowtie2-build {config["starting_prg"]["fasta_ref"]} {output_ref_index}/{ref_name}'
 
-rule validate_input_regions:
+
+rule map_reads_to_ref:
+	"""Used by graphtyper genotyper and for manually validating some input dels"""
 	input:
-		vcfs=expand(f'{output_minimap2}/{{sample}}_vars.vcf.gz',sample=SAMPLES),
-		input_regions=config["beds"]["with_origin"],
-	output:
-		vcf=f'{output_regions}/minimap2_vars.vcf.gz',
-		tsv=f'{output_regions}/minimap2_validated.tsv',
-	params:
-		validation_script=f'{config["scripts"]}/{WORKFLOW}/find_input_dels.py'
-	shell:
-		"""
-		bcftools merge {input.vcfs} -Oz -o {output.vcf}
-		python3 {params.validation_script} {output.vcf} {input.input_regions} {output.tsv}
-		"""
-
-rule gram_build:
-	input:
-		prg=config["starting_prg"]["gram_prg"],
-		ref=config["starting_prg"]["fasta_ref"]
-		
-	output:
-		f'{output_gram_build}/cov_graph',
-
-	params:
-		k=config["starting_prg"]["gram_kmer_size"],
-		gram_dir=output_gram_build,
-
-	resources:
-		mem_mb=20000
-
-	shell:
-		"""
-		gramtools build --prg {input.prg} --ref {input.ref} --kmer_size {params.k} --gram_dir {params.gram_dir} --force
-		"""
-
-rule vg_build:
-	input:
-		vg_graph=config["starting_prg"]["vg_prg"]
-	output:
-		xg=f'{output_vg_build / "prg.xg"}',
-		gcsa=f'{output_vg_build / "prg.gcsa"}',
-		snarls=f'{output_vg_build / "prg.snarls"}',
-	params:
-		k=config["starting_prg"]["vg_kmer_size"],
-		X=config["starting_prg"]["vg_doubling_steps"],
-	shadow:
-		"shallow"
-	resources:
-		mem_mb=25000
-	threads:
-		10
-	shell:
-		"""
-		vg index -k {params.k} -x {output.xg} -L {input.vg_graph} 
-		vg prune -r -t {threads} {input.vg_graph} > pruned.vg
-		vg index -L -X {params.X} -k {params.k} -g {output.gcsa} -p -t {threads} pruned.vg
-		vg snarls {output.xg} > {output.snarls}
-		#vg deconstruct -p ref -e {input.vg_graph} {input.vg_graph} > {{output.vcf}}
-		"""
-
-rule gramtools_genotype:
-	input:
-		gram_build_completed=rules.gram_build.output,
-		gram_dir=f'{Path(rules.gram_build.output[0]).parent}',
-		reads_files=get_reads
-
-	output:
-		sample_geno_dir=directory(f'{output_genotyped}/{conditions[0]}/{{sample}}'),
-		gzipped=f'{output_genotyped}/{conditions[0]}/{{sample}}.vcf.gz',
-		indexed=f'{output_genotyped}/{conditions[0]}/{{sample}}.vcf.gz.csi',
-		jvcf=f'{output_genotyped}/{conditions[0]}/{{sample}}/genotype/genotyped.json',
-
-	threads: 10
-	resources:
-		mem_mb=10000
-
-	shell:
-		"""
-		gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --force
-		cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.gzipped}
-		bcftools index {output.gzipped}
-		bcftools filter -i 'FT!="AMBIG"' {output.gzipped} -Oz -o tmp.vcf.gz
-		mv tmp.vcf.gz {output.gzipped} && bcftools index {output.gzipped}
-		"""
-
-rule vg_map:
-	input:
-		xg=rules.vg_build.output.xg,
-		gcsa=rules.vg_build.output.gcsa,
 		reads_files=get_reads,
+		ref_idx=rules.index_reference.output.ref_idx,
 	output:
-		mapped_packed=f'{output_vg_mapped}/mapped_{{sample}}.pack',
-	params:
-		mapped_gam=f'{output_vg_mapped}/mapped_{{sample}}.gam',
-	threads: 10
-	resources:
-		mem_mb=10000
-	shadow:
+		bam=f'{output_ref_alignments}/{{sample}}.bam',
+	shadow: 
 		"shallow"
+	threads: 10
 	shell:
 		"""
-		rfilecmd=""
-		for rfile in {input.reads_files}; do rfilecmd="$rfilecmd -f $rfile"; done
-		vg map -x {input.xg} -g {input.gcsa} $rfilecmd -t {threads} > {params.mapped_gam}
-		vg pack -x {input.xg} -g {params.mapped_gam} -Q 5 -o {output.mapped_packed}
+		bowtie2 -x {input.ref_idx} -1 {input.reads_files[0]} -2 {input.reads_files[1]} -S tmp.sam -p {threads}
+		samtools sort tmp.sam -O BAM -o {output.bam}
 		"""
-
-rule vg_genotype:
-	input:
-		xg=rules.vg_build.output.xg,
-		mapped=rules.vg_map.output.mapped_packed,
-		snarls=rules.vg_build.output.snarls,
-		vcf_to_genotype=config["vcf_to_genotype"]
-	output:
-		gzipped=f'{output_genotyped}/{conditions[1]}/{{sample}}.vcf.gz',
-		indexed=f'{output_genotyped}/{conditions[1]}/{{sample}}.vcf.gz.csi',
-	params:
-		vcf=f'{output_genotyped}/{conditions[1]}/{{sample}}.vcf',
-	shell:
-		"""
-		vg call {input.xg} -k {input.mapped} -v {input.vcf_to_genotype} -r {input.snarls} -s {wildcards.sample} --ploidy 1 > {params.vcf}
-		bgzip {params.vcf} && bcftools index {output.gzipped}
-		"""
-
-rule baseline_ref_genotype:
-	"""Dummy rule producing empty vcfs used for baseline gene portion-assembly alignments"""
-	input:
-		vcf=config["vcf_template"]
-	output:
-		gzipped=temp(f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz'),
-		indexed=f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz.csi',
-	params:
-		vcf=f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf',
-	shell:
-		"""
-		cp {input.vcf} {params.vcf}
-		sed -i 's/sample/{wildcards.sample}/' {params.vcf}
-		bgzip {params.vcf} && bcftools index {output.gzipped}
-		"""
-
-rule merge_and_assess_vcfs:
-	input:
-		vcfs=expand(f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz', sample = SAMPLES, allow_missing=True),
-		input_regions=config["beds"]["with_origin"],
-	output:
-		vcf=f'{output_genotyped}/{{condition}}_merged.vcf.gz',
-		tsv=f'{output_genotyped}/{{condition}}_validated.tsv',
-	params:
-		validation_script=f'{config["scripts"]}/{WORKFLOW}/find_input_dels.py'
-	shell:
-		"bcftools merge {input.vcfs} -m all -Oz -o {output.vcf};"
-		"python3 {params.validation_script} {output.vcf} {input.input_regions} {output.tsv}"
-
 
 rule describe_vcf_prg:
 	input:

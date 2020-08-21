@@ -1,6 +1,6 @@
 # This script maps ilmn reads to i)ref genome ii)assembly for samples for which column 4, which indicates whether a deletion has been recovered, is set to 0.
-# It also mapped the reference portion of the genome around the deletion to the assembly to obtain its coordinates in the assembly.
-# The outputs allow manual inspection of said deletions.
+# It also maps the reference portion of the genome around the deletion to the assembly to obtain its coordinates in the assembly.
+# The outputs allow manual inspection of said deletions using ACT (Artemis Comparison Tool)
 
 reads_dir="analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_reads"
 assembly_dir="analysis/outputs/tb_bigdel/bowtie_indexes"
@@ -8,7 +8,7 @@ genome="analysis/input_data/mtuberculosis/ref_genome/H37Rv.fasta"
 genome_name="NC_000962.3"
 minimap_eval=""
 
-base_dir="analysis/outputs/tb_bigdel/recover_deletions"
+base_dir="analysis/outputs/tb_bigdel/alignments/"
 ref_portions="${base_dir}/ref_portions" && mkdir -p $ref_portions
 ref_idx="${base_dir}/ref_idx" && mkdir -p $ref_idx
 aln_asm="${base_dir}/ilmn_alignments_asm" && mkdir -p $aln_asm

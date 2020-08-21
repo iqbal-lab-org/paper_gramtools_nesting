@@ -1,8 +1,52 @@
 This is the repository for the gramtools nested variation paper analysis. It is divided into snakemake workflows, one folder each in analysis/workflows.
 
+They are designed to be run in a cluster environment with a singularity container containing all dependencies. 
 
-Workflows
-===========
+Running on cluster
+====================
+
+Requirements for running
+--------------------------
+
+* Snakemake==v5.14.0
+* Singularity>=v3.4.0-1
+
+Steps for running
+-------------------
+* Requires singu container image in container/built. Can be built for example running `sudo singularity build container/built/singu.sif container/singu_def.def`. 
+  CAVEATS [TODOs]:
+    * gramtools building is poorly supported. Also, if you want to upgrade version of gramtools in container, fetch/merge and rebuild gramtools from the container, can't just copy a new binary into the container, otherwise get shared library (hts) linking error.
+    * package in requirements.txt not installed in def file yet, but needed for rules that plot notably
+
+* Current working directory when running any workflow should be the git top-level directory(where this file is)
+
+* On ebi cluster: `module load singularity/3.[45].[0-9]`
+
+* Requires  lsf profile for snakemake: https://github.com/Snakemake-Profiles/snakemake-lsf. Requires as in cluster config yaml file is being deprecated.
+The non-defaults configs are: LSF_UNIT_FOR_LIMITS=MB, default_cluster_logdir=run/logs/lsf_profile
+
+* `bash analysis/cluster_submit.sh workflow_name`
+
+
+Order of running
+-------------------
+
+Some workflows consume outputs from other workflows.
+
+* pacb_ilmn_validation and msps_dimorphism require make_prgs on plasmodium.yaml config file
+
+* tb_bigdel requires i)make_prgs on mtuberculosis.yaml config file ii)vg_make_prgs
+
+
+Development
+------------
+
+
+This is good once all tools and versions are finalised. While working on the paper, it is not convenient as you have to rebuild and transfer the whole image if anything changes (eg one line in gramtools). For development, it is best therefore to work with a python `venv` at top-level. Then `pip install -r requirements`. Then locate gramtools on cluster, cmake/make it, and `pip install -e` it from inside the `venv`. And in the workflows, comment out `container:` line. All tools must be available on cluster.
+
+
+Workflow details
+====================
 
 Configuration is always done via the workflow yaml file in analysis/configs. If a workflow can use one of several yaml (eg make_prgs), the desired one needs to be used in the workflow's Snakefile.
 
@@ -52,10 +96,6 @@ Find index from POS:
 Find corresponding site given REF sequence of site allele: 
 ``` jq '.Sites[] | select(.ALS[] | contains("my_allele"))' gtyped.json```
 
-TODOs:
-* Understand why coverage at base level site is ~77 when fold cov is 40 in simulations (it is also in the nested sites)
-* Make a figure with the GC distrib PRG-wide and a dotgraph of the nested PRG site 579 for DBLMSP2, explaining how we get i)better GT CONF in nested and ii)how we get indiv SNP call coverage/conf. For i), report the next best allele at genotyping time and its coverage for both nested and non-nested.
-
 Plasmodium DBLMSPs
 ```````````````````
 
@@ -99,37 +139,4 @@ msps_dimorphism
 This is to analyse dimorphisms in DBLMSP1 and DBLMSP2 from pf3k genotyped samples on the DBLMSP prg.
 
 
-
-Running on cluster
-====================
-
-Warning
---------
-
-The workflows are reproducible so as to support transparency of the paper results. To this effect they are meant to be run in a cluster environment and with a singularity container encapsulating the dependencies. 
-
-This is good once all tools and versions are finalised. While working on the paper, it is not convenient as you have to rebuild and transfer the whole image if anything changes (eg one line in gramtools). For development, it is best therefore to work with a python `venv` at top-level. Then `pip install -r requirements`. Then locate gramtools on cluster, cmake/make it, and `pip install -e` it from inside the `venv`. And in the workflows, comment out `container:` line. All tools must be available on cluster.
-
-
-Requirements for running
---------------------------
-
-* Snakemake==v5.14.0
-* Singularity>=v3.4.0-1
-
-Steps for running
--------------------
-* Requires singu container image in container/built. Can be built for example running `sudo singularity build container/built/singu.sif container/singu_def.def`. 
-  CAVEATS [TODOs]:
-    * gramtools building is poorly supported. Also, if you want to upgrade version of gramtools in container, fetch/merge and rebuild gramtools from the container, can't just copy a new binary into the container, otherwise get shared library (hts) linking error.
-    * package in requirements.txt not installed in def file yet, but needed for rules that plot notably
-
-* Current working directory when running any workflow should be the git top-level directory(where this file is)
-
-* On ebi cluster: `module load singularity/3.[45].[0-9]`
-
-* Requires  lsf profile for snakemake: https://github.com/Snakemake-Profiles/snakemake-lsf. Requires as in cluster config yaml file is being deprecated.
-The non-defaults configs are: LSF_UNIT_FOR_LIMITS=MB, default_cluster_logdir=run/logs/lsf_profile
-
-* `bash analysis/cluster_submit.sh workflow_name`!
 
