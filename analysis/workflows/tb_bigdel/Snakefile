@@ -38,11 +38,12 @@ output_gene_portions = output_alignments / "gene_portions"
 output_plots = output_base / "plots"
 
 # sed 's/<DEL:.*>/<DEL>/ '
-conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "baseline_ref","graphtyper2"]
+conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "graphtyper2", "baseline_ref"]
 output_gmtools = output_genotyped / conditions[0]
 output_vg_mapped = output_genotyped / conditions[1] / "mapped_reads"
-output_baseline_ref = output_genotyped / conditions[2]
-output_graphtyper = output_genotyped / conditions[3]
+output_graphtyper = output_genotyped / conditions[2]
+output_graphtyper_original = output_graphtyper / "original"
+output_baseline_ref = output_genotyped / conditions[3]
 
 mk_output_dirs(dir())
 
@@ -57,7 +58,7 @@ include: "genotype.smk"
 
 rule all:
 	input:
-		genotyped=expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions[0:2], ftype=["merged.vcf.gz", "validated.tsv"]),
+		genotyped=expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions[0:3], ftype=["merged.vcf.gz", "validated.tsv"]),
 		validated=f'{output_regions}/minimap2_validated.tsv',
 		variant_counts=expand(f'{output_prg_desc}/{{condition}}_variants.tsv',condition = conditions[0:2]),
 		stats=f'{output_plots}/stats.tsv'

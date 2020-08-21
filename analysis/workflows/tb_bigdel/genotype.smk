@@ -113,10 +113,10 @@ rule baseline_ref_genotype:
 	input:
 		vcf=config["vcf_template"]
 	output:
-		gzipped=temp(f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz'),
-		indexed=f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz.csi',
+		gzipped=temp(f'{output_genotyped}/{conditions[3]}/{{sample}}.vcf.gz'),
+		indexed=f'{output_genotyped}/{conditions[3]}/{{sample}}.vcf.gz.csi',
 	params:
-		vcf=f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf',
+		vcf=f'{output_genotyped}/{conditions[3]}/{{sample}}.vcf',
 	shell:
 		"""
 		cp {input.vcf} {params.vcf}
@@ -132,8 +132,7 @@ rule graphtyper_genotype:
 		vcf=config["vcf_to_genotype"],
 		ref=config["starting_prg"]["fasta_ref"],
 	output:
-		gzipped=f'{output_genotyped}/{conditions[3]}/{{sample}}.vcf.gz',
-		indexed=f'{output_genotyped}/{conditions[3]}/{{sample}}.vcf.gz.csi',
+		vcf=f'{output_genotyped}/{conditions[2]}/original/{{sample}}.vcf.gz',
 	shadow:
 		"shallow"
 	threads: 10
@@ -155,14 +154,31 @@ rule graphtyper_genotype:
 		done
 		graphtyper genotype_sv --vverbose --region_file $region_file --output $output_dir --sam {input.bam} --threads {threads} {input.ref} {input.vcf}
 
-		# Concat in positionally sorted order + process symbolic alleles for use by bcftools consensus downstream (only DEL supported)
+		# Concat in positionally sorted order
 		IFS=$'\n'
 		vcfs_made=($(find ${{output_dir}}/${{ref_name}} -name "*.vcf.gz" | sort -n))
-		bcftools concat "${{vcfs_made[@]}}" | sed 's/<DEL.*>/<DEL>/' | sed '/<INS.*>/ d' > tmp.vcf
+		bcftools concat "${{vcfs_made[@]}}" -Oz -o {output.vcf}
+	"""
+
+rule graphtyper_postprocess:
+	input:
+		vcf=rules.graphtyper_genotype.output.vcf,
+	output:
+		gzipped=f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz',
+		indexed=f'{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz.csi',
+	shadow:
+		"shallow"
+	shell:
+		"""
+		 # Process symbolic alleles for use by bcftools consensus downstream: only DEL is supported
+		gunzip -c {input.vcf} | sed 's/<DEL.*AGGREGATED.*>/<DEL>/' | sed '/<DEL:.*>/ d' | sed '/<INS.*>/ d' > tmp.vcf
+
+		# Remove OLD_VARIANT_ID INFO field as it prevents merging
+		sed -r 's/OLD_VARIANT_ID=(UNION_BC[0-9a-zA-Z_]+;)+//g' tmp.vcf > no_INFO.vcf
 
 		# Change sample name
-		echo "$(bcftools query -l tmp.vcf) {wildcards.sample}" > rename.txt
-		bcftools reheader -s rename.txt tmp.vcf > renamed.vcf
+		echo "$(bcftools query -l no_INFO.vcf) {wildcards.sample}" > rename.txt
+		bcftools reheader -s rename.txt no_INFO.vcf > renamed.vcf
 		bgzip -c renamed.vcf > {output.gzipped}
-		bcftools index {output.gzipped}
+		bcftools index -f {output.gzipped}
 		"""

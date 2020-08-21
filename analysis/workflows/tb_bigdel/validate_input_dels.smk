@@ -39,5 +39,5 @@ rule merge_and_assess_vcfs:
 	params:
 		validation_script=f'{config["scripts"]}/{WORKFLOW}/find_input_dels.py'
 	shell:
-		"bcftools merge {input.vcfs} -m all -Oz -o {output.vcf};"
+		"bcftools merge {input.vcfs} -i - -m all -Oz -o {output.vcf};"
 		"python3 {params.validation_script} {output.vcf} {input.input_regions} {output.tsv}"

@@ -18,21 +18,35 @@ def load_gtyped_dels(called_vcf) -> Intervals:
     for rec in vcf_recs.fetch():
         samples = set()
         bigdels = []
+        symbolic = False
         for name, vals in rec.samples.items():
             gt_allele = vals["GT"][0]
             if gt_allele is None:
                 continue
-            if len(rec.ref) - len(rec.alleles[gt_allele]) > 100:
+            gtyped_allele = rec.alleles[gt_allele]
+            if gtyped_allele == "<DEL>":
+                symbolic = True
+            if len(rec.ref) - len(gtyped_allele) > 100:
                 samples.add(name)
-                bigdels.append(rec.alleles[gt_allele])
+                if symbolic:
+                    bigdels.append("N")
+                else:
+                    bigdels.append(gtyped_allele)
 
         if len(samples) == 0:
             continue
 
-        del_len = len(rec.ref) - min(map(len, bigdels))  # Take len of largest deletion
+        if symbolic:
+            del_len = rec.info["SVSIZE"]
+        else:
+            del_len = len(rec.ref) - min(map(len, bigdels))  # Take len of largest deletion
 
+        if symbolic:
+            stop = rec.pos + del_len
+        else:
+            stop = rec.pos + len(rec.ref) - 1
         gtyped_dels.append(
-            Interval(rec.pos, rec.pos + len(rec.ref) - 1, samples, del_len)
+            Interval(rec.pos, stop, samples, del_len)
         )
     return gtyped_dels
 
