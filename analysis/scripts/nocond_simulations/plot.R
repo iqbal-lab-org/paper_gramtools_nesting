@@ -1,5 +1,6 @@
-library(tidyverse)
+library(dplyr)
 library(purrr)
+library(ggplot2)
 library(argparser, quietly=TRUE)
 
 p <- arg_parser("Plot genotyping performance")
