@@ -147,18 +147,18 @@ rule graphtyper_genotype:
 		> $region_file
 		IFS="\n"; for gene_line in $(cat {input.var_regions})
 		do
-			ref_name=${{elems[0]}}
 			IFS="\t"; elems=($gene_line)	
+			ref_name=${{elems[0]}}
 			adjusted_start=$((${{elems[1]}} + 1))
 			reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
 			echo $reg >> $region_file
 		done
 		graphtyper genotype_sv --vverbose --region_file $region_file --output $output_dir --sam {input.bam} --threads {threads} {input.ref} {input.vcf}
 
-		# Concat in positionally sorted order, and make DEL and INS symbolic alleles applyable by bcftools consensus downstream
+		# Concat in positionally sorted order + process symbolic alleles for use by bcftools consensus downstream (only DEL supported)
 		IFS=$'\n'
-		vcfs_made=($(find ${output_dir}/${ref_name} -name "*.vcf.gz" | sort -n))
-		bcftools concat "${vcfs_made[@]}" | sed 's/<DEL.*>/<DEL>/' | sed 's/<INS.*>/<INS>/' > tmp.vcf
+		vcfs_made=($(find ${{output_dir}}/${{ref_name}} -name "*.vcf.gz" | sort -n))
+		bcftools concat "${{vcfs_made[@]}}" | sed 's/<DEL.*>/<DEL>/' | sed '/<INS.*>/ d' > tmp.vcf
 
 		# Change sample name
 		echo "$(bcftools query -l tmp.vcf) {wildcards.sample}" > rename.txt
