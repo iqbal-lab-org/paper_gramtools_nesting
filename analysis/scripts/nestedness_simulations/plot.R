@@ -1,6 +1,8 @@
 #Plots precision/recall of calls and genotype confidence/genotype confidence percentile distributions
 
-library(tidyverse)
+library(ggplot2)
+library(tibble)
+library(dplyr)
 library(argparser, quietly=TRUE)
 library(rjson)
 

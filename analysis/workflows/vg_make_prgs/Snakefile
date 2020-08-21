@@ -107,7 +107,7 @@ rule make_input_vcf:
 		bcftools merge -f PASS -r {params.regions} -Oz -o tmp.vcf.gz -l {input.vcf_fofn}
 		bcftools norm -c x -f {input.ref_genome} -Oz -o {output.merged} tmp.vcf.gz
 		bcftools index {output.merged}
-		tabix {output.merged} # required for `vg call -v`
+		tabix {output.merged} # required for `vg call -v and graphtyper`
 		"""
 
 rule prg_from_vcf:
