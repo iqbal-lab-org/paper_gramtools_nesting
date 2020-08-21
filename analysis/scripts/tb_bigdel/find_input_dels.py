@@ -24,9 +24,9 @@ def load_gtyped_dels(called_vcf) -> Intervals:
             if gt_allele is None:
                 continue
             gtyped_allele = rec.alleles[gt_allele]
-            if gtyped_allele == "<DEL>":
+            if gtyped_allele == "<DEL>" and rec.info["SVSIZE"] > 100:
                 symbolic = True
-            if len(rec.ref) - len(gtyped_allele) > 100:
+            if len(rec.ref) - len(gtyped_allele) > 100 or symbolic:
                 samples.add(name)
                 if symbolic:
                     bigdels.append("N")
@@ -39,15 +39,16 @@ def load_gtyped_dels(called_vcf) -> Intervals:
         if symbolic:
             del_len = rec.info["SVSIZE"]
         else:
-            del_len = len(rec.ref) - min(map(len, bigdels))  # Take len of largest deletion
+            del_len = len(rec.ref) - min(
+                map(len, bigdels)
+            )  # Take len of largest deletion
 
         if symbolic:
             stop = rec.pos + del_len
+            print("symbolic", rec.pos, del_len)
         else:
             stop = rec.pos + len(rec.ref) - 1
-        gtyped_dels.append(
-            Interval(rec.pos, stop, samples, del_len)
-        )
+        gtyped_dels.append(Interval(rec.pos, stop, samples, del_len))
     return gtyped_dels
 
 

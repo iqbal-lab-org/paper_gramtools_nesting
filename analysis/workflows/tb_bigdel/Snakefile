@@ -61,7 +61,7 @@ rule all:
 		genotyped=expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions[0:3], ftype=["merged.vcf.gz", "validated.tsv"]),
 		validated=f'{output_regions}/minimap2_validated.tsv',
 		variant_counts=expand(f'{output_prg_desc}/{{condition}}_variants.tsv',condition = conditions[0:2]),
-		stats=f'{output_plots}/stats.tsv'
+		plots=f'{output_plots}/upset_plot_{GMTOOLS_COMMIT}.pdf',
 
 
 rule index_pacb_assemblies:
@@ -161,3 +161,14 @@ rule process_alignments:
 		f"""
 		python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots}
 		"""
+
+rule plot_alignments:
+	input:
+		stats=f'{output_plots}/stats.tsv',
+	output:
+		expand(f'{output_plots}/{{plot_name}}_plot_{GMTOOLS_COMMIT}.pdf',plot_name=["ecdf","upset"]),
+	shell:
+		f"""
+		Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots} {GMTOOLS_COMMIT}
+		"""
+
