@@ -155,5 +155,5 @@ rule process_alignments:
 		stats=f'{output_plots}/stats.tsv'
 	shell:
 		f"""
-		python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {{input.alignments}} {{input.var_regions}} {output_plots}
+		python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots}
 		"""

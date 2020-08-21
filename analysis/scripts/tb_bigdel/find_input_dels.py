@@ -74,7 +74,7 @@ def main(called_vcf: click.Path, input_dels_bed: click.Path, output_file: str):
             delta_len = "."
             delta_pos = "."
         elif len(found_dels) == 1:
-            delta_len = input_del.del_len - found_dels[0].del_len
+            delta_len = len(input_del) - len(found_dels[0])
             delta_pos = input_del.start - found_dels[0].start
         else:
             delta_len = "MULTI"
@@ -82,7 +82,7 @@ def main(called_vcf: click.Path, input_dels_bed: click.Path, output_file: str):
 
         for sample in sorted(input_del.samples):
             found = 1 if sample in found_samples else 0
-            line = f"{input_del.start}\t{input_del.del_len}\t{sample}\t"
+            line = f"{input_del.start}\t{len(input_del)}\t{sample}\t"
             line += f"{found}\t{delta_len}\t{delta_pos}\n"
             fout.write(line)
 

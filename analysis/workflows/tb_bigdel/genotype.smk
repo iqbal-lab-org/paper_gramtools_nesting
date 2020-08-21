@@ -40,7 +40,7 @@ rule gramtools_genotype:
 		cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.gzipped}
 		bcftools index {output.gzipped}
 		bcftools filter -i 'FT!="AMBIG"' {output.gzipped} -Oz -o tmp.vcf.gz
-		mv tmp.vcf.gz {output.gzipped} && bcftools index {output.gzipped}
+		mv tmp.vcf.gz {output.gzipped} && bcftools index -f {output.gzipped}
 		"""
 
 
