@@ -1,16 +1,25 @@
 import os
 from pathlib import Path
 
+
 configfile: "analysis/configs/common.yaml"
+
+
 configfile: "analysis/configs/nestedness_simulations/nestedness_simulations.yaml"
-container : config["container"]
+
+
+container: config["container"]
+
 
 include: "utils.py"
+
+
 include: "../common_utils.py"
+
 
 GMTOOLS_COMMIT = get_gmtools_commit()
 
-#_____Set up output paths______#
+# _____Set up output paths______#
 output_base = Path(f"analysis/outputs/nestedness_simulations")
 output_paths = output_base / "paths"
 output_reads = output_base / "reads"
@@ -22,145 +31,162 @@ output_eval = output_base_commit / "evaluation"
 output_plots = output_base_commit / "plots"
 
 for variable in filter(lambda name: name.startswith("output"), dir()):
-	Path(eval(variable)).mkdir(exist_ok=True, parents=True)
+    Path(eval(variable)).mkdir(exist_ok=True, parents=True)
 
 
 rule all:
-		input:
-			expand(f'{output_plots}/{{dataset}}_precision_recall.pdf', dataset=datasets)
+    input:
+        expand(f"{output_plots}/{{dataset}}_precision_recall.pdf", dataset=datasets),
+
 
 rule gram_build:
-	input:
-		prg=get_prg_path
-	output:
-		f'{output_build}/{{dataset}}_{{nesting}}/prg'
-	params:
-		genome=get_genome_path,
-		coords=get_coords,
-		gram_dir=directory(f'{output_build}/{{dataset}}_{{nesting}}'),
-		prg_converter_script=f'{config["scripts"]}/make_prgs/concat_prgs.py'
-	resources:
-		mem_mb=10000
-	shadow: "shallow"
-	shell:
-		"cp {input.prg} raw_prg;"
-		"echo -e '\t\t\traw_prg' > regions.bed;"
-		"python3 {params.prg_converter_script} . regions.bed ./prg;"
-		"samtools faidx {params.genome} {params.coords} > tmp_ref.fa;"
-		f'gramtools build --gram_dir {{params.gram_dir}} --ref tmp_ref.fa --prg ./prg --kmer_size {config["k"]} --force;'
+    input:
+        prg=get_prg_path,
+    output:
+        f"{output_build}/{{dataset}}_{{nesting}}/prg",
+    params:
+        genome=get_genome_path,
+        coords=get_coords,
+        gram_dir=directory(f"{output_build}/{{dataset}}_{{nesting}}"),
+        prg_converter_script=f'{config["scripts"]}/make_prgs/concat_prgs.py',
+    resources:
+        mem_mb=10000,
+    shadow:
+        "shallow"
+    shell:
+        "cp {input.prg} raw_prg;"
+        "echo -e '\t\t\traw_prg' > regions.bed;"
+        "python3 {params.prg_converter_script} . regions.bed ./prg;"
+        "samtools faidx {params.genome} {params.coords} > tmp_ref.fa;"
+        f'gramtools build --gram_dir {{params.gram_dir}} --ref tmp_ref.fa --prg ./prg --kmer_size {config["k"]} --force;'
 
 
 rule simulate_paths:
-	input:
-		get_prg_paths
-	output:
-		expand(f'{output_paths}/{{dataset}}_{{nesting}}.json',nesting=conditions,allow_missing=True),
-		simu_fasta=f'{output_paths}/{{dataset}}_nonested.fasta',
-	params:
-		sample_ids=expand('{dataset}_{nesting}',nesting=conditions,allow_missing=True),
-		output_dir=output_paths,
-		num_paths=config["num_simu_paths"],
-		paths_dir=f'{output_paths}/all_paths'
-	shell:
-		# The `mv`s are because we want the JSON sample names to only have dataset in name, but the filenames to also have the nesting condition
-		"gramtools simulate --prg {input[0]} -o {params.output_dir} --sample_id {wildcards.dataset} -n {params.num_paths} --force;"
-		"mv {params.output_dir}/{wildcards.dataset}.json {params.output_dir}/{params.sample_ids[0]}.json;"
-		"mv {params.output_dir}/{wildcards.dataset}.fasta {params.output_dir}/{params.sample_ids[0]}.fasta;"
-		"gramtools simulate --prg {input[1]} -o {params.output_dir} --sample_id {wildcards.dataset} -i {output.simu_fasta} --force;"
-		"mv {params.output_dir}/{wildcards.dataset}.json {params.output_dir}/{params.sample_ids[1]}.json;"
+    input:
+        get_prg_paths,
+    output:
+        expand(
+            f"{output_paths}/{{dataset}}_{{nesting}}.json",
+            nesting=conditions,
+            allow_missing=True,
+        ),
+        simu_fasta=f"{output_paths}/{{dataset}}_nonested.fasta",
+    params:
+        sample_ids=expand(
+            "{dataset}_{nesting}", nesting=conditions, allow_missing=True
+        ),
+        output_dir=output_paths,
+        num_paths=config["num_simu_paths"],
+        paths_dir=f"{output_paths}/all_paths",
+    shell:
+        "gramtools simulate --prg {input[0]} -o {params.output_dir} --sample_id {wildcards.dataset} -n {params.num_paths} --force;"
+        "mv {params.output_dir}/{wildcards.dataset}.json {params.output_dir}/{params.sample_ids[0]}.json;"
+        "mv {params.output_dir}/{wildcards.dataset}.fasta {params.output_dir}/{params.sample_ids[0]}.fasta;"
+        "gramtools simulate --prg {input[1]} -o {params.output_dir} --sample_id {wildcards.dataset} -i {output.simu_fasta} --force;"
+        "mv {params.output_dir}/{wildcards.dataset}.json {params.output_dir}/{params.sample_ids[1]}.json;" # The `mv`s are because we want the JSON sample names to only have dataset in name, but the filenames to also have the nesting condition
 
 
 checkpoint split_multifasta_paths:
-	input:
-		expand(f'{output_paths}/{{dataset}}_nonested.fasta', dataset = datasets)
-	output:
-		paths_dir=directory(f'{output_paths}/all_paths')
-	shell:
-		"""
-		paths_dir={output.paths_dir}
-		mkdir -p $paths_dir
-		for fname in {input}; do
-			dataset=$(basename $fname)
-			dataset=${{dataset%.*}}
-			dataset=${{dataset/_nonested/}}
-			awk '/^>/{{s=\"'$paths_dir'/'$dataset'_\"++d\".fa\"}} {{print > s}}' $fname
-		done
-		"""
-		# Latter line puts each record in its own numbered fasta
+    input:
+        expand(f"{output_paths}/{{dataset}}_nonested.fasta", dataset=datasets),
+    output:
+        paths_dir=directory(f"{output_paths}/all_paths"),
+    shell:
+        """
+        paths_dir={output.paths_dir}
+        mkdir -p $paths_dir
+        for fname in {input}; do
+            dataset=$(basename $fname)
+            dataset=${{dataset%.*}}
+            dataset=${{dataset/_nonested/}}
+            awk '/^>/{{s=\"'$paths_dir'/'$dataset'_\"++d\".fa\"}} {{print > s}}' $fname
+        done
+        """ # Latter line puts each record in its own numbered fasta
+
 
 rule simulate_reads:
-	input:
-		f'{output_paths}/all_paths/{{dataset}}_{{num}}.fa'
-	output:
-		f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq'
-
-	params:
-		output_dir=f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}',
-		read_len=config["read_len"]
-	shell:
-		"mkdir -p {params.output_dir};"
-		"art_illumina -ss HS25 -i {input} -l {params.read_len} -f {wildcards.cov} -qs {wildcards.err} -o {params.output_dir}/{wildcards.num};"
-		"rm {params.output_dir}/{wildcards.num}.aln"
+    input:
+        f"{output_paths}/all_paths/{{dataset}}_{{num}}.fa",
+    output:
+        f"{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq",
+    params:
+        output_dir=f"{output_reads}/{{dataset}}/e{{err}}_c{{cov}}",
+        read_len=config["read_len"],
+    shell:
+        "mkdir -p {params.output_dir};"
+        "art_illumina -ss HS25 -i {input} -l {params.read_len} -f {wildcards.cov} -qs {wildcards.err} -o {params.output_dir}/{wildcards.num};"
+        "rm {params.output_dir}/{wildcards.num}.aln"
 
 
 rule genotype:
-	input:
-		reads=f'{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq',
-		gram_build=f'{output_build}/{{dataset}}_{{nesting}}/prg'
-	output:
-		f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json'
-	params:
-		output_dir=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}',
-		build_dir=f'{output_build}/{{dataset}}_{{nesting}}'
-	threads: 10
-	resources:
-		mem_mb=10000
-	shell:
-		"mkdir -p {params.output_dir};"
-		"gramtools genotype -i {params.build_dir} -o {params.output_dir}"
-		" --reads {input.reads} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --force --debug;"
-		"mv {params.output_dir}/genotype/genotyped.json {output}"
+    input:
+        reads=f"{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq",
+        gram_build=f"{output_build}/{{dataset}}_{{nesting}}/prg",
+    output:
+        f"{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json",
+    params:
+        output_dir=(
+            f"{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}"
+        ),
+        build_dir=f"{output_build}/{{dataset}}_{{nesting}}",
+    threads: 10
+    resources:
+        mem_mb=10000,
+    shell:
+        "mkdir -p {params.output_dir};"
+        "gramtools genotype -i {params.build_dir} -o {params.output_dir}"
+        " --reads {input.reads} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --force --debug;"
+        "mv {params.output_dir}/genotype/genotyped.json {output}"
+
 
 rule evaluate:
-	input:
-		res_json=f'{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json',
-		truth_json=f'{output_paths}/{{dataset}}_{{nesting}}.json',
-	output:
-		f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv'
-	params:
-		eval_script=f'{config["scripts"]}/nocond_simulations/evaluate.py'
-	shell:
-		'python3 {params.eval_script} -n {wildcards.dataset} --num {wildcards.num} '
-		'-e {wildcards.err} -c {wildcards.cov} --nesting {wildcards.nesting} {input.truth_json} {input.res_json} {output} '
+    input:
+        res_json=f"{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json",
+        truth_json=f"{output_paths}/{{dataset}}_{{nesting}}.json",
+    output:
+        f"{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv",
+    params:
+        eval_script=f'{config["scripts"]}/nocond_simulations/evaluate.py',
+    shell:
+        "python3 {params.eval_script} -n {wildcards.dataset} --num {wildcards.num} "
+        "-e {wildcards.err} -c {wildcards.cov} --nesting {wildcards.nesting} {input.truth_json} {input.res_json} {output} "
+
 
 def aggregate_simu_paths(wildcards):
-	checkpoint_output = checkpoints.split_multifasta_paths.get(**wildcards).output.paths_dir
-	res = expand(f'{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv', 
-			dataset = datasets,
-			err = config["simu_read_params"]["err_scaling"], cov = config["simu_read_params"]["fcov"],
-			nesting = conditions,
-			num = glob_wildcards(f'{checkpoint_output}/{{dataset}}_{{num}}.fa').num)
-	#print(res)
-	return res
+    checkpoint_output = checkpoints.split_multifasta_paths.get(
+        **wildcards
+    ).output.paths_dir
+    res = expand(
+        f"{output_eval}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_eval.tsv",
+        dataset=datasets,
+        err=config["simu_read_params"]["err_scaling"],
+        cov=config["simu_read_params"]["fcov"],
+        nesting=conditions,
+        num=glob_wildcards(f"{checkpoint_output}/{{dataset}}_{{num}}.fa").num,
+    )
+    # print(res)
+    return res
+
 
 rule aggregate:
-	input:
-		aggregate_simu_paths
-	output:
-		f'{output_eval}/all.tsv'
-	params:
-		eval_script=f'{config["scripts"]}/nocond_simulations/evaluate.py'
-	shell:
-		"python3 {params.eval_script} -p > {output};"	
-		'cat {input} >> {output}'
+    input:
+        aggregate_simu_paths,
+    output:
+        f"{output_eval}/all.tsv",
+    params:
+        eval_script=f'{config["scripts"]}/nocond_simulations/evaluate.py',
+    shell:
+        "python3 {params.eval_script} -p > {output};"
+        "cat {input} >> {output}"
+
 
 rule plot:
-	input:
-		to_eval=rules.aggregate.output,
-	output:
-		f'{output_plots}/{{dataset}}_precision_recall.pdf'
-	params:
-		plot_script=f'{config["scripts"]}/nestedness_simulations/plot.R',
-	shell:
-		f"mkdir -p {output_plots} && Rscript {{params.plot_script}} {{input.to_eval}} "
-		f"{output_plots} {{wildcards.dataset}} {GMTOOLS_COMMIT}"
+    input:
+        to_eval=rules.aggregate.output,
+    output:
+        f"{output_plots}/{{dataset}}_precision_recall.pdf",
+    params:
+        plot_script=f'{config["scripts"]}/nestedness_simulations/plot.R',
+    shell:
+        f"mkdir -p {output_plots} && Rscript {{params.plot_script}} {{input.to_eval}} "
+        f"{output_plots} {{wildcards.dataset}} {GMTOOLS_COMMIT}"

@@ -2,23 +2,32 @@ from pathlib import Path
 
 WORKFLOW = "msps_dimorphism"
 
+
 configfile: "analysis/configs/common.yaml"
+
+
 configfile: f"analysis/configs/{WORKFLOW}.yaml"
+
+
 container: config["container"]
 
+
 include: "utils.py"
+
+
 include: "../common_utils.py"
+
 
 GMTOOLS_COMMIT = get_gmtools_commit()
 
-#_____Set up output paths______#
+# _____Set up output paths______#
 output_base = Path(f"analysis/outputs/{WORKFLOW}/{GMTOOLS_COMMIT}")
 output_gram_build = Path(f'{config["gram_builds_dir"]}/{config["gene_list_name"]}')
 output_gtyping = output_base / "gtyping"
 output_msas = output_base / "msas"
 output_sequences = output_msas / "sequences"
 output_trees = output_base / "phylo_trees"
-#output_drawn_trees = output_trees / "plots"
+# output_drawn_trees = output_trees / "plots"
 output_tree_splits = output_trees / "tree_splits"
 output_graphs = output_base / "graphs"
 output_heatmaps = output_base / "heatmaps"
@@ -26,201 +35,221 @@ output_clusters = output_base / "clusters"
 
 mk_output_dirs(dir())
 
-genes = get_tree_genes(config["genes_bed"]) # in utils.py
+genes = get_tree_genes(config["genes_bed"])  # in utils.py
 
 for gene in genes:
-	(output_sequences / gene).mkdir(exist_ok=True)
-	(output_trees / gene).mkdir(exist_ok=True)
+    (output_sequences / gene).mkdir(exist_ok=True)
+    (output_trees / gene).mkdir(exist_ok=True)
 
 
-samples = get_bams(config["pf3k"]["bams_filelist"]) # in utils.py
+samples = get_bams(config["pf3k"]["bams_filelist"])  # in utils.py
 
 
 rule all:
-	input:
-		graphs=expand(f"{output_graphs}/{{gene}}_{{filename}}.gml", gene = genes, filename = ["all_samples", "partition_1", "partition_2"]),
-		heatmaps=expand(f"{output_heatmaps}/{{gene}}_hmap.pdf", gene = genes),
-		cluster_dists=expand(f'{output_clusters}/{{gene}}_cluster_distmatrix.tsv', gene=genes)
+    input:
+        graphs=expand(
+            f"{output_graphs}/{{gene}}_{{filename}}.gml",
+            gene=genes,
+            filename=["all_samples", "partition_1", "partition_2"],
+        ),
+        heatmaps=expand(f"{output_heatmaps}/{{gene}}_hmap.pdf", gene=genes),
+        cluster_dists=expand(
+            f"{output_clusters}/{{gene}}_cluster_distmatrix.tsv", gene=genes
+        ),
+
 
 rule build:
-	input:
-		prg=config["prg"],
-		ref=config["prg_ref"]
-	output:
-		f'{output_gram_build / "prg"}'
-	resources:
-		mem_mb=10000
-	shell:
-		"gramtools build --prg {input.prg} --ref {input.ref} --gram_dir {output_gram_build} --kmer_size 10 --force"
+    input:
+        prg=config["prg"],
+        ref=config["prg_ref"],
+    output:
+        f'{output_gram_build / "prg"}',
+    resources:
+        mem_mb=10000,
+    shell:
+        "gramtools build --prg {input.prg} --ref {input.ref} --gram_dir {output_gram_build} --kmer_size 10 --force"
+
 
 rule genotype:
-	input:
-		gram_build_done=rules.build.output[0],
-		reads=f'{config["pf3k"]["bams_basedir"]}/{{sample}}.bam',
-	output:	
-		vcf=f"{output_gtyping}/{{sample}}/res.vcf.gz",
-		vcf_index=f"{output_gtyping}/{{sample}}/res.vcf.gz.csi",
-		json=f"{output_gtyping}/{{sample}}/res.json",
-		read_stats=f"{output_gtyping}/{{sample}}/read_stats.json",
-
-	params:
-		geno_dir=f"{output_gtyping}/{{sample}}/geno"
-	threads: 10
-	resources:
-		mem_mb=10000
-	shell:
-		"""
-		gramtools genotype --gram_dir {output_gram_build} --reads {input.reads} --sample_id {wildcards.sample} --ploidy haploid --seed 42 --max_threads {threads} -o {params.geno_dir} --force
-		mv {params.geno_dir}/genotype/genotyped.vcf.gz {output.vcf}	
-		mv {params.geno_dir}/genotype/genotyped.json {output.json}	
-		mv {params.geno_dir}/read_stats.json {output.read_stats}	
-		rm -r {params.geno_dir}
-		bcftools index {output.vcf}
-		"""
+    input:
+        gram_build_done=rules.build.output[0],
+        reads=f'{config["pf3k"]["bams_basedir"]}/{{sample}}.bam',
+    output:
+        vcf=f"{output_gtyping}/{{sample}}/res.vcf.gz",
+        vcf_index=f"{output_gtyping}/{{sample}}/res.vcf.gz.csi",
+        json=f"{output_gtyping}/{{sample}}/res.json",
+        read_stats=f"{output_gtyping}/{{sample}}/read_stats.json",
+    params:
+        geno_dir=f"{output_gtyping}/{{sample}}/geno",
+    threads: 10
+    resources:
+        mem_mb=10000,
+    shell:
+        """
+        gramtools genotype --gram_dir {output_gram_build} --reads {input.reads} --sample_id {wildcards.sample} --ploidy haploid --seed 42 --max_threads {threads} -o {params.geno_dir} --force
+        mv {params.geno_dir}/genotype/genotyped.vcf.gz {output.vcf}    
+        mv {params.geno_dir}/genotype/genotyped.json {output.json}    
+        mv {params.geno_dir}/read_stats.json {output.read_stats}    
+        rm -r {params.geno_dir}
+        bcftools index {output.vcf}
+        """
 
 
 rule combine_calls:
-	"""Makes combined JSON for analysing"""
-	input:
-		expand(f"{output_gtyping}/{{sample}}/res.{{ext}}",sample = samples, ext = ["json"])
-	output:
-		f"{output_gtyping}/combined.json"
-	params:
-		tmp_fofn=f"{output_gtyping}/fofn.txt"
-	resources:
-		mem_mb=5000
-	shell:
-		"""
-		echo {input} | tr ' ' '\n' > {params.tmp_fofn}
-		combine_jvcfs {params.tmp_fofn} {output}
-		rm {params.tmp_fofn}
-		"""
+    """Makes combined JSON for analysing"""
+    input:
+        expand(f"{output_gtyping}/{{sample}}/res.{{ext}}", sample=samples, ext=["json"]),
+    output:
+        f"{output_gtyping}/combined.json",
+    params:
+        tmp_fofn=f"{output_gtyping}/fofn.txt",
+    resources:
+        mem_mb=5000,
+    shell:
+        """
+        echo {input} | tr ' ' '\n' > {params.tmp_fofn}
+        combine_jvcfs {params.tmp_fofn} {output}
+        rm {params.tmp_fofn}
+        """
+
 
 rule make_seq_slices:
-	input:
-		prg_ref = config["prg_ref"],
-		genes_bed = config["genes_bed"],
-		sample_vcf = rules.genotype.output.vcf
-	output:
-		sequences=expand(f"{output_sequences}/{{gene}}/{{sample}}.fa",gene=genes, allow_missing=True)
-	params:
-		outdir=f"{output_sequences}"
-	shell:
-		"""
-		IFS="\n"; for gene_line in $(cat {input.genes_bed})
-		do
-			IFS="\t"; elems=($gene_line)	
-			adj_start=$((${{elems[1]}} + 1))
-			reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
-			fout={params.outdir}/${{elems[3]}}/{wildcards.sample}.fa
-			samtools faidx {input.prg_ref} $reg | bcftools consensus -s {wildcards.sample} {input.sample_vcf} |
-				sed 's/>.*/>'{wildcards.sample}'/' > $fout
-		done
-		"""
+    input:
+        prg_ref=config["prg_ref"],
+        genes_bed=config["genes_bed"],
+        sample_vcf=rules.genotype.output.vcf,
+    output:
+        sequences=expand(
+            f"{output_sequences}/{{gene}}/{{sample}}.fa", gene=genes, allow_missing=True
+        ),
+    params:
+        outdir=f"{output_sequences}",
+    shell:
+        """
+        IFS="\n"; for gene_line in $(cat {input.genes_bed})
+        do
+            IFS="\t"; elems=($gene_line)    
+            adj_start=$((${{elems[1]}} + 1))
+            reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+            fout={params.outdir}/${{elems[3]}}/{wildcards.sample}.fa
+            samtools faidx {input.prg_ref} $reg | bcftools consensus -s {wildcards.sample} {input.sample_vcf} |
+                sed 's/>.*/>'{wildcards.sample}'/' > $fout
+        done
+        """
+
 
 rule cat_sequences:
-	input:
-		sequences=expand(f"{output_sequences}/{{gene}}/{{sample}}.fa",
-			sample = samples, allow_missing=True)
-	output:
-		f"{output_sequences}/{{gene}}/all_seqs.fa"
-	shell:
-		"cat {input} > {output}"
+    input:
+        sequences=expand(
+            f"{output_sequences}/{{gene}}/{{sample}}.fa",
+            sample=samples,
+            allow_missing=True,
+        ),
+    output:
+        f"{output_sequences}/{{gene}}/all_seqs.fa",
+    shell:
+        "cat {input} > {output}"
+
 
 rule msa_genes:
-	input:
-		rules.cat_sequences.output[0]
-	output:
-		f"{output_msas}/{{gene}}.msa"
-	resources:
-		mem_mb=7000
-	shell:
-		"mafft {input} > {output}"
+    input:
+        rules.cat_sequences.output[0],
+    output:
+        f"{output_msas}/{{gene}}.msa",
+    resources:
+        mem_mb=7000,
+    shell:
+        "mafft {input} > {output}"
+
 
 rule phylo_trees:
-	input:
-		f"{output_msas}/{{gene}}.msa"
-	output:
-		f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}"
-	params:
-		outdir=f"{output_trees}/{{gene}}"
-	resources:
-		mem_mb=10000
-	threads: 8
-	shell:
-		"""
-		if [ ! -e {output} ]; then
-			raxmlHPC-PTHREADS -s {input} -n {wildcards.gene} -m GTRCAT -p 42 --no-seq-check -w $(realpath {params.outdir}) -T {threads}
-		fi
-		"""
-	
+    input:
+        f"{output_msas}/{{gene}}.msa",
+    output:
+        f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}",
+    params:
+        outdir=f"{output_trees}/{{gene}}",
+    resources:
+        mem_mb=10000,
+    threads: 8
+    shell:
+        """
+        if [ ! -e {output} ]; then
+            raxmlHPC-PTHREADS -s {input} -n {wildcards.gene} -m GTRCAT -p 42 --no-seq-check -w $(realpath {params.outdir}) -T {threads}
+        fi
+        """
+
+
 rule tree_basal_split:
-	input:
-		f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}"
-	output:
-		split=f"{output_tree_splits}/{{gene}}.basal_split",
-		plot=f"{output_tree_splits}/{{gene}}.pdf",
-	params:
-		script=f'{config["scripts"]}/{WORKFLOW}/tree_partition.py',
-		output_prefix=f"{output_tree_splits}/{{gene}}"
-	shell:
-		"python3 {params.script} {input} {params.output_prefix}"
+    input:
+        f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}",
+    output:
+        split=f"{output_tree_splits}/{{gene}}.basal_split",
+        plot=f"{output_tree_splits}/{{gene}}.pdf",
+    params:
+        script=f'{config["scripts"]}/{WORKFLOW}/tree_partition.py',
+        output_prefix=f"{output_tree_splits}/{{gene}}",
+    shell:
+        "python3 {params.script} {input} {params.output_prefix}"
+
 
 rule build_graphs:
-	input:
-		res_json=f"{output_gtyping}/combined.json",
-		genes_bed=config["genes_bed"],
-		tree_split=f"{output_tree_splits}/{{gene}}.basal_split",
-	output:
-		all_samples=f"{output_graphs}/{{gene}}_all_samples.gml",
-		partition1=f"{output_graphs}/{{gene}}_partition_1.gml",
-		partition2=f"{output_graphs}/{{gene}}_partition_2.gml",
-	params:
-		output_prefix=f"{output_graphs}/{{gene}}",
-		script=f'{config["scripts"]}/{WORKFLOW}/get_site_diversity_graphs.py'
-	shell:
-		"""
-		# Produce region
-		match=$(grep -w {wildcards.gene} {input.genes_bed})
-		if [[ -z ${{match}} ]]; then echo "ERROR: No match of gene name in bed file"; exit 1; fi
-		IFS="\t"; elems=($match)	
-		adj_start=$((${{elems[1]}} + 1))
-		reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+    input:
+        res_json=f"{output_gtyping}/combined.json",
+        genes_bed=config["genes_bed"],
+        tree_split=f"{output_tree_splits}/{{gene}}.basal_split",
+    output:
+        all_samples=f"{output_graphs}/{{gene}}_all_samples.gml",
+        partition1=f"{output_graphs}/{{gene}}_partition_1.gml",
+        partition2=f"{output_graphs}/{{gene}}_partition_2.gml",
+    params:
+        output_prefix=f"{output_graphs}/{{gene}}",
+        script=f'{config["scripts"]}/{WORKFLOW}/get_site_diversity_graphs.py',
+    shell:
+        """
+        # Produce region
+        match=$(grep -w {wildcards.gene} {input.genes_bed})
+        if [[ -z ${{match}} ]]; then echo "ERROR: No match of gene name in bed file"; exit 1; fi
+        IFS="\t"; elems=($match)    
+        adj_start=$((${{elems[1]}} + 1))
+        reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
 
-		python3 {params.script} {input.res_json} {params.output_prefix} --region $reg # for all_samples
-		python3 {params.script} {input.res_json} {params.output_prefix} --region $reg -p {input.tree_split} # for partitions
-		"""
-	
+        python3 {params.script} {input.res_json} {params.output_prefix} --region $reg # for all_samples
+        python3 {params.script} {input.res_json} {params.output_prefix} --region $reg -p {input.tree_split} # for partitions
+        """
+
+
 rule build_heatmaps:
-	input:
-		res_json=f"{output_gtyping}/combined.json",
-		genes_bed=config["genes_bed"],
-	output:
-		hapg_data=f"{output_heatmaps}/{{gene}}_hapgs.tsv",
-		plot=f"{output_heatmaps}/{{gene}}_hmap.pdf",
-	params:
-		output_prefix=f"{output_heatmaps}/{{gene}}",
-		script=f'{config["scripts"]}/{WORKFLOW}/hapg_heatmap.py'
-	shell:
-		"""
-		# Produce region
-		match=$(grep -w {wildcards.gene} {input.genes_bed})
-		if [[ -z ${{match}} ]]; then echo "ERROR: No match of gene name in bed file"; exit 1; fi
-		IFS="\t"; elems=($match)	
-		adj_start=$((${{elems[1]}} + 1))
-		reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
+    input:
+        res_json=f"{output_gtyping}/combined.json",
+        genes_bed=config["genes_bed"],
+    output:
+        hapg_data=f"{output_heatmaps}/{{gene}}_hapgs.tsv",
+        plot=f"{output_heatmaps}/{{gene}}_hmap.pdf",
+    params:
+        output_prefix=f"{output_heatmaps}/{{gene}}",
+        script=f'{config["scripts"]}/{WORKFLOW}/hapg_heatmap.py',
+    shell:
+        """
+        # Produce region
+        match=$(grep -w {wildcards.gene} {input.genes_bed})
+        if [[ -z ${{match}} ]]; then echo "ERROR: No match of gene name in bed file"; exit 1; fi
+        IFS="\t"; elems=($match)    
+        adj_start=$((${{elems[1]}} + 1))
+        reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
 
-		python3 {params.script} {input.res_json} {params.output_prefix} --region $reg
-		"""
+        python3 {params.script} {input.res_json} {params.output_prefix} --region $reg
+        """
+
 
 rule cluster_dists:
-	input:
-		sequences=rules.cat_sequences.output,
-		hapg_matrix=rules.build_heatmaps.output.hapg_data,
-	output:
-		f'{output_clusters}/{{gene}}_cluster_distmatrix.tsv'
-	params:
-		script=f'{config["scripts"]}/{WORKFLOW}/cluster_distances.py',
-		output_prefix=f'{output_clusters}/{{gene}}'
-	shell:
-		"python3 {params.script} {input.hapg_matrix} {input.sequences} {params.output_prefix}"
+    input:
+        sequences=rules.cat_sequences.output,
+        hapg_matrix=rules.build_heatmaps.output.hapg_data,
+    output:
+        f"{output_clusters}/{{gene}}_cluster_distmatrix.tsv",
+    params:
+        script=f'{config["scripts"]}/{WORKFLOW}/cluster_distances.py',
+        output_prefix=f"{output_clusters}/{{gene}}",
+    shell:
+        "python3 {params.script} {input.hapg_matrix} {input.sequences} {params.output_prefix}"

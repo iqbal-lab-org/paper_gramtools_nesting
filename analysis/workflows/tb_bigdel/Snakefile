@@ -8,20 +8,29 @@ This workflow takes bed files listing regions + where they occur, a ref genome, 
 
 The workflow has some rules similar/identical to pacb_ilmn_validation workflow, but is kept distinct as it does not assess gramtools perf against other standard var callers, but against other genome graph tool(s).
 """
-WORKFLOW = 'tb_bigdel'
-VALIDATION_WORKFLOW = 'pacb_ilmn_validation'
+WORKFLOW = "tb_bigdel"
+VALIDATION_WORKFLOW = "pacb_ilmn_validation"
+
 
 configfile: "analysis/configs/common.yaml"
+
+
 configfile: f"analysis/configs/tb_bigdel.yaml"
-#container: config["container"]
+
+
+# container: config["container"]
+
 
 # Include convenience functions
 include: f"../{VALIDATION_WORKFLOW}/utils.py"
+
+
 include: "../common_utils.py"
+
 
 GMTOOLS_COMMIT = get_gmtools_commit()
 
-#_____Set up output paths______#
+# _____Set up output paths______#
 output_gram_build = Path(f'{config["gram_builds_dir"]}/{WORKFLOW}/{GMTOOLS_COMMIT}')
 output_vg_build = Path(f'{config["vg_builds_dir"]}/{WORKFLOW}')
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
@@ -50,125 +59,163 @@ mk_output_dirs(dir())
 SAMPLES = get_samples(config["sample_tsv"])
 ref_name = Path(config["starting_prg"]["fasta_ref"]).stem
 
-localrules: all, baseline_ref_genotype
+
+localrules:
+    all,
+    baseline_ref_genotype,
+
 
 # Include rule sets
 include: "validate_input_dels.smk"
+
+
 include: "genotype.smk"
 
+
 rule all:
-	input:
-		genotyped=expand(f'{output_genotyped}/{{condition}}_{{ftype}}', condition = conditions[0:3], ftype=["merged.vcf.gz", "validated.tsv"]),
-		validated=f'{output_regions}/minimap2_validated.tsv',
-		variant_counts=expand(f'{output_prg_desc}/{{condition}}_variants.tsv',condition = conditions[0:2]),
-		plots=f'{output_plots}/upset_plot_{GMTOOLS_COMMIT}.pdf',
+    input:
+        genotyped=expand(
+            f"{output_genotyped}/{{condition}}_{{ftype}}",
+            condition=conditions[0:3],
+            ftype=["merged.vcf.gz", "validated.tsv"],
+        ),
+        validated=f"{output_regions}/minimap2_validated.tsv",
+        variant_counts=expand(
+            f"{output_prg_desc}/{{condition}}_variants.tsv", condition=conditions[0:2]
+        ),
+        plots=f"{output_plots}/upset_plot_{GMTOOLS_COMMIT}.pdf",
 
 
 rule index_pacb_assemblies:
-	input:
-		assembly=get_assembly
-	output:
-		expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}',ext=bowtie2_idx_extensions, allow_missing=True),
-	shell:
-		f"bowtie2-build {{input.assembly[0]}} {output_bowtie_indexes}/{{wildcards.sample}}"
+    input:
+        assembly=get_assembly,
+    output:
+        expand(
+            f"{output_bowtie_indexes}/{{sample}}.{{ext}}",
+            ext=bowtie2_idx_extensions,
+            allow_missing=True,
+        ),
+    shell:
+        f"bowtie2-build {{input.assembly[0]}} {output_bowtie_indexes}/{{wildcards.sample}}"
 
 
 rule index_reference:
-	output:
-		ref_idx=expand(f'{output_ref_index}/{ref_name}.{{ext}}',ext=bowtie2_idx_extensions),
-	shell:
-		f'bowtie2-build {config["starting_prg"]["fasta_ref"]} {output_ref_index}/{ref_name}'
+    output:
+        ref_idx=expand(
+            f"{output_ref_index}/{ref_name}.{{ext}}", ext=bowtie2_idx_extensions
+        ),
+    shell:
+        f'bowtie2-build {config["starting_prg"]["fasta_ref"]} {output_ref_index}/{ref_name}'
 
 
 rule map_reads_to_ref:
-	"""Used by graphtyper genotyper and for manually validating some input dels"""
-	input:
-		reads_files=get_reads,
-		ref_idx=rules.index_reference.output.ref_idx,
-	output:
-		bam=expand(f'{output_ref_alignments}/{{sample}}{{ext}}',ext=[".bam",".bam.bai"],allow_missing=True),
-	shadow: 
-		"shallow"
-	threads: 10
-	params:
-		idx_prefix=f'{output_ref_index}/{ref_name}',
-	shell:
-		"""
-		bowtie2 -x {params.idx_prefix} -1 {input.reads_files[0]} -2 {input.reads_files[1]} -S tmp.sam -p {threads}
-		samtools sort tmp.sam -O BAM -o {output.bam}
-		samtools index {output.bam}
-		"""
+    """Used by graphtyper genotyper and for manually validating some input dels"""
+    input:
+        reads_files=get_reads,
+        ref_idx=rules.index_reference.output.ref_idx,
+    output:
+        bam=expand(
+            f"{output_ref_alignments}/{{sample}}{{ext}}",
+            ext=[".bam", ".bam.bai"],
+            allow_missing=True,
+        ),
+    shadow:
+        "shallow"
+    threads: 10
+    params:
+        idx_prefix=f"{output_ref_index}/{ref_name}",
+    shell:
+        """
+        bowtie2 -x {params.idx_prefix} -1 {input.reads_files[0]} -2 {input.reads_files[1]} -S tmp.sam -p {threads}
+        samtools sort tmp.sam -O BAM -o {output.bam}
+        samtools index {output.bam}
+        """
+
 
 rule describe_vcf_prg:
-	input:
-		input_regions=config["beds"]["merged"],
-		vg_vcf=f'{output_genotyped}/{conditions[1]}_merged.vcf.gz',
-	output:
-		desc=f'{output_prg_desc}/{conditions[1]}_variants.tsv',
-	params:
-		script=f'{config["scripts"]}/{WORKFLOW}/count_prg_variants.py',
-	shell:
-		"python3 {params.script} {input.vg_vcf} {input.input_regions} {output.desc}"	
+    input:
+        input_regions=config["beds"]["merged"],
+        vg_vcf=f"{output_genotyped}/{conditions[1]}_merged.vcf.gz",
+    output:
+        desc=f"{output_prg_desc}/{conditions[1]}_variants.tsv",
+    params:
+        script=f'{config["scripts"]}/{WORKFLOW}/count_prg_variants.py',
+    shell:
+        "python3 {params.script} {input.vg_vcf} {input.input_regions} {output.desc}"
 
 
 rule describe_jvcf_prg:
-	input:
-		input_regions=config["beds"]["merged"],
-		gram_jvcf=f'{output_genotyped}/{conditions[0]}/{SAMPLES[0]}/genotype/genotyped.json',
-	output:
-		desc=f'{output_prg_desc}/{conditions[0]}_variants.tsv',
-	params:
-		script=f'{config["scripts"]}/{WORKFLOW}/count_prg_variants.py',
-	shell:
-		"python3 {params.script} {input.gram_jvcf} {input.input_regions} {output.desc}"	
+    input:
+        input_regions=config["beds"]["merged"],
+        gram_jvcf=(
+            f"{output_genotyped}/{conditions[0]}/{SAMPLES[0]}/genotype/genotyped.json"
+        ),
+    output:
+        desc=f"{output_prg_desc}/{conditions[0]}_variants.tsv",
+    params:
+        script=f'{config["scripts"]}/{WORKFLOW}/count_prg_variants.py',
+    shell:
+        "python3 {params.script} {input.gram_jvcf} {input.input_regions} {output.desc}"
 
 
 rule align_induced_gene_seqs_tb_bigdel:
-	input:
-		truth_ref_idx=expand(f'{output_bowtie_indexes}/{{sample}}.{{ext}}', ext=bowtie2_idx_extensions, allow_missing=True),
-		result_vcf=f'{output_genotyped}/{{condition}}/{{sample}}.vcf.gz',
-		var_regions=config["beds"]["with_flank"],
-		fasta_ref=config["starting_prg"]["fasta_ref"],
-	output:
-		alignment_file=f'{output_alignments}/{{condition}}_{{sample}}.sam',
-	params:
-		gene_portions=f'{output_gene_portions}/{{condition}}_{{sample}}.fa',
-		idx_prefix=f'{output_bowtie_indexes}/{{sample}}',
-	resources:
-		mem_mb=2000
-	shell:
-		"""
-		> {params.gene_portions}
-		IFS="\n"; for gene_line in $(cat {input.var_regions})
-		do
-			IFS="\t"; elems=($gene_line)	
-			adjusted_start=$((${{elems[1]}} + 1))
-			reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
-			gene_name=${{elems[3]}}
-			samtools faidx {input.fasta_ref} $reg | bcftools consensus -s {wildcards.sample} {input.result_vcf} |
-				sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
-		done
-		bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
-		"""
+    input:
+        truth_ref_idx=expand(
+            f"{output_bowtie_indexes}/{{sample}}.{{ext}}",
+            ext=bowtie2_idx_extensions,
+            allow_missing=True,
+        ),
+        result_vcf=f"{output_genotyped}/{{condition}}/{{sample}}.vcf.gz",
+        var_regions=config["beds"]["with_flank"],
+        fasta_ref=config["starting_prg"]["fasta_ref"],
+    output:
+        alignment_file=f"{output_alignments}/{{condition}}_{{sample}}.sam",
+    params:
+        gene_portions=f"{output_gene_portions}/{{condition}}_{{sample}}.fa",
+        idx_prefix=f"{output_bowtie_indexes}/{{sample}}",
+    resources:
+        mem_mb=2000,
+    shell:
+        """
+        > {params.gene_portions}
+        IFS="\n"; for gene_line in $(cat {input.var_regions})
+        do
+            IFS="\t"; elems=($gene_line)    
+            adjusted_start=$((${{elems[1]}} + 1))
+            reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
+            gene_name=${{elems[3]}}
+            samtools faidx {input.fasta_ref} $reg | bcftools consensus -s {wildcards.sample} {input.result_vcf} |
+                sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
+        done
+        bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
+        """
+
 
 rule process_alignments:
-	input:
-		alignments=expand(f'{output_alignments}/{{condition}}_{{sample}}.sam', condition=conditions, sample=SAMPLES),
-		var_regions=config["beds"]["with_flank"],
-	output:
-		stats=f'{output_plots}/stats.tsv'
-	shell:
-		f"""
-		python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots}
-		"""
+    input:
+        alignments=expand(
+            f"{output_alignments}/{{condition}}_{{sample}}.sam",
+            condition=conditions,
+            sample=SAMPLES,
+        ),
+        var_regions=config["beds"]["with_flank"],
+    output:
+        stats=f"{output_plots}/stats.tsv",
+    shell:
+        f"""
+        python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots}
+        """
+
 
 rule plot_alignments:
-	input:
-		stats=f'{output_plots}/stats.tsv',
-	output:
-		expand(f'{output_plots}/{{plot_name}}_plot_{GMTOOLS_COMMIT}.pdf',plot_name=["ecdf","upset"]),
-	shell:
-		f"""
-		Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots} {GMTOOLS_COMMIT}
-		"""
-
+    input:
+        stats=f"{output_plots}/stats.tsv",
+    output:
+        expand(
+            f"{output_plots}/{{plot_name}}_plot_{GMTOOLS_COMMIT}.pdf",
+            plot_name=["ecdf", "upset"],
+        ),
+    shell:
+        f"""
+        Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots} {GMTOOLS_COMMIT}
+        """
