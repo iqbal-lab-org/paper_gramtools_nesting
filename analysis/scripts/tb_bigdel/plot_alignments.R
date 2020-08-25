@@ -13,30 +13,59 @@ p <- add_argument(p, "gramtools_commit", help="")
 argv <- parse_args(p)
 dir.create(argv$output_dir)
 
-#df <- as_tibble(read.csv("/tmp/stats.tsv", sep="\t"))
-df <- as_tibble(read.csv(argv$input_tsv, sep="\t"))
+#df_unfiltered <- as_tibble(read.csv("/tmp/stats.tsv", sep="\t"))
+df_unfiltered <- as_tibble(read.csv(argv$input_tsv, sep="\t"))
 
-conditions = as.character(unique(df$condition))
+# Remove commit from gramtools condition name
+conditions = as.character(unique(df_unfiltered$condition))
 gram_cond = conditions[grep("gramtools_*", conditions)]
-df$condition = replace(as.vector(df$condition), df$condition == gram_cond, "gramtools")
-conditions = as.character(unique(df$condition))
+df_unfiltered$condition = replace(as.vector(df_unfiltered$condition), df_unfiltered$condition == gram_cond, "gramtools")
+conditions = as.character(unique(df_unfiltered$condition))
 
-## Plot empirical cumulative distribution function ##
-df_filt = df %>% filter(NM < 0.005)
-ecdf_plot <- ggplot(df_filt, aes(x = NM, colour = condition)) + stat_ecdf(geom="step") + 
+# Filter out alignments with worse MAPQ than baseline_ref seqs
+df <- df_unfiltered %>% filter(delta_MAPQ >= 0)
+
+## Plot empirical cumulative distribution functions ##
+ecdf_plot <- ggplot(df_unfiltered, aes(x = NM, colour = condition)) + stat_ecdf(geom="step") + 
   ylab("fraction of sequences") + xlab("edit distance")
-fname <- sprintf("ecdf_plot_%s.pdf", argv$gramtools_commit)
+fname <- sprintf("ecdf_plot_%s_unfiltered.pdf", argv$gramtools_commit)
 ggsave(file.path(argv$output_dir,fname),width = 9, height = 6, plot=ecdf_plot)
 
-## Plot set intersections: upset plot ##
-# Convert to long format
+ecdf_plot <- ggplot(df, aes(x = NM, colour = condition)) + stat_ecdf(geom="step") + 
+  ylab("fraction of sequences") + xlab("edit distance")
+fname <- sprintf("ecdf_plot_%s_filtered_nondecreased_mapq.pdf", argv$gramtools_commit)
+ggsave(file.path(argv$output_dir,fname),width = 9, height = 6, plot=ecdf_plot)
 
+
+## Plot set intersections: upset plot ##
 
 # Using upsetR package, gives set size as well
 library(UpSetR)
-df_long_numeric <- df %>% mutate(found = as.numeric(!is.na(NM))) %>% select(sample, gene, condition, found) %>% spread(condition, found)
+# Convert to long format: matrix of 1s and 0s saying whether each seq was found
+# The filter on MAPQ achieves following:
+#    - Keeps mapped sequences only (MAPQ is not na)
+#    - Keeps mapped sequences where delta_MAPQ is NA: this means we recover a seq that baseline_ref did not
+#    - Keeps mapped sequences only if delta_MAPQ is not negative: removes worse alignments
+df_long_numeric <- df_unfiltered %>%
+  filter(!is.na(MAPQ) & (delta_MAPQ >= 0 | is.na(delta_MAPQ))) %>% 
+  mutate(found = as.numeric(!is.na(NM))) %>%
+  select(sample, gene, condition, found) %>%
+  spread(condition, found) %>%
+  replace(is.na(.), 0)
 #pdf(file=file.path("/tmp","upset_plot.pdf"),width = 9, height = 6)
-fname <- sprintf("upset_plot_%s.pdf", argv$gramtools_commit)
+fname <- sprintf("upset_plot_%s_filtered_nondecreased_mapq.pdf", argv$gramtools_commit)
+pdf(file=file.path(argv$output_dir,fname),width = 9, height = 6, onefile=FALSE)
+upset(as.data.frame(df_long_numeric), sets=,order.by="freq")
+dev.off()
+
+# Same plot, with no filtering
+df_long_numeric <- df_unfiltered %>%
+  mutate(found = as.numeric(!is.na(NM))) %>%
+  select(sample, gene, condition, found) %>%
+  spread(condition, found) %>%
+  replace(is.na(.), 0)
+#pdf(file=file.path("/tmp","upset_plot.pdf"),width = 9, height = 6)
+fname <- sprintf("upset_plot_%s_unfiltered.pdf", argv$gramtools_commit)
 pdf(file=file.path(argv$output_dir,fname),width = 9, height = 6, onefile=FALSE)
 upset(as.data.frame(df_long_numeric), sets=,order.by="freq")
 dev.off()
@@ -52,5 +81,9 @@ dev.off()
 #df_upset %>%  ggplot(aes(x = Sequences)) + geom_bar() + scale_x_upset() + 
 #  geom_text(stat='count', aes(label=..count..), vjust = -1)
 
+### Utilities ###
 # Show sequences missed by gramtools but found by others
 #df_long %>% filter(baseline_ref == TRUE & gramtools == FALSE & vg == TRUE)
+
+# Get mean edit distance by condition
+#df %>% group_by(condition) %>% summarise(dist=mean(NM,na.rm=TRUE))

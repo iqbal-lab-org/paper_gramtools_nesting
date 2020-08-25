@@ -19,7 +19,7 @@ class MultipleAlignmentsError(Exception):
     pass
 
 
-Scores = namedtuple("Scores", ["NM", "AS"])
+Scores = namedtuple("Scores", ["NM", "AS", "MAPQ"])
 GeneScores = Dict[str, Scores]
 BaselineScores: Dict[str, GeneScores] = dict()
 
@@ -54,9 +54,10 @@ def get_scores(sam_fname: Path, gene_lengths: Dict[str, int]) -> GeneScores:
             NM = NM / gene_lengths[gene_name]
             # Convert to positive so that high is bad, low is good, like for NM.
             AS = read.get_tag("AS") * -1
-            result[gene_name] = Scores(NM, AS)
+            MAPQ = read.mapping_quality
+            result[gene_name] = Scores(NM, AS, MAPQ)
         except KeyError:  # Case: read not aligned
-            result[gene_name] = Scores("NA", "NA")
+            result[gene_name] = Scores("NA", "NA", "NA")
 
     return result
 
@@ -97,7 +98,17 @@ def write_stats(sam_file_list: List[Path], output_stats: Path, gene_lengths):
 
     # Second pass: get scores and deltas relative to baseline
     with output_stats.open("w") as stats_file:
-        fieldnames = ["sample", "gene", "condition", "NM", "AS", "delta_NM", "delta_AS"]
+        fieldnames = [
+            "sample",
+            "gene",
+            "condition",
+            "NM",
+            "AS",
+            "MAPQ",
+            "delta_NM",
+            "delta_AS",
+            "delta_MAPQ",
+        ]
         stats_file.write("\t".join(fieldnames) + "\n")
 
         for sam_fname in sam_file_list:
@@ -111,8 +122,10 @@ def write_stats(sam_file_list: List[Path], output_stats: Path, gene_lengths):
                     condition,
                     scores[gene].NM,
                     scores[gene].AS,
+                    scores[gene].MAPQ,
                     delta_scores[gene].NM,
                     delta_scores[gene].AS,
+                    delta_scores[gene].MAPQ,
                 ]
                 stats_file.write("\t".join(map(str, row)) + "\n")
 
