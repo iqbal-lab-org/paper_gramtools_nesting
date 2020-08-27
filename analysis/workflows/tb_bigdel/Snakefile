@@ -1,10 +1,10 @@
 """
 This workflow takes bed files listing regions + where they occur, a ref genome, a list of matched sample reads and pacbio assemblies and initial prgs to start from and runs:
-	- validate input variant regions are present in truth assemblies
-	- {vg, gramtools} prg index building
-	- {vg, gramtools} mapping/genotyping
-	- vcf merging per condition + validate input var regions present in called samples
-	- edit distance of called regions to truth assemblies
+    - validate input variant regions are present in truth assemblies
+    - {vg, gramtools} prg index building
+    - {vg, gramtools} mapping/genotyping
+    - vcf merging per condition + validate input var regions present in called samples
+    - edit distance of called regions to truth assemblies
 
 The workflow has some rules similar/identical to pacb_ilmn_validation workflow, but is kept distinct as it does not assess gramtools perf against other standard var callers, but against other genome graph tool(s).
 """
@@ -83,7 +83,7 @@ rule all:
         variant_counts=expand(
             f"{output_prg_desc}/{{condition}}_variants.tsv", condition=conditions[0:2]
         ),
-        plots=f"{output_plots}/upset_plot_{GMTOOLS_COMMIT}.pdf",
+        plots=f"{output_plots}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
 
 
 rule index_pacb_assemblies:
@@ -199,11 +199,17 @@ rule process_alignments:
             sample=SAMPLES,
         ),
         var_regions=config["beds"]["with_flank"],
+        mask_bed=config["beds"]["ilmn_asm_mask"],
     output:
         stats=f"{output_plots}/stats.tsv",
+        alignment_mask=f"{output_plots}/alignment_mask_overlap.bed",
+    shadow:
+        "shallow"
     shell:
         f"""
-        python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots}
+        python3 {config["scripts"]}/{WORKFLOW}/make_alignment_beds.py {output_alignments} alignment.bed
+        bedtools coverage -a alignment.bed -b {{input.mask_bed}} > {{output.alignment_mask}}
+        python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots} --mask_bed {{output.alignment_mask}}
         """
 
 
@@ -212,7 +218,7 @@ rule plot_alignments:
         stats=f"{output_plots}/stats.tsv",
     output:
         expand(
-            f"{output_plots}/{{plot_name}}_plot_{GMTOOLS_COMMIT}.pdf",
+            f"{output_plots}/{{plot_name}}_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
             plot_name=["ecdf", "upset"],
         ),
     shell:

@@ -1,18 +1,9 @@
-import sys
 from collections import namedtuple
 from typing import Dict, Tuple, List
 from pathlib import Path
 
 from pysam import AlignmentFile
-
-
-def usage():
-    print(
-        f"usage: {sys.argv[0]} input_dir input_bed output_dir\n"
-        "The input_dir should contain the .sam files to analyse.\n"
-        "The input_bed should contain the read names in column 4."
-    )
-    exit(1)
+import click
 
 
 class MultipleAlignmentsError(Exception):
@@ -22,6 +13,25 @@ class MultipleAlignmentsError(Exception):
 Scores = namedtuple("Scores", ["NM", "AS", "MAPQ"])
 GeneScores = Dict[str, Scores]
 BaselineScores: Dict[str, GeneScores] = dict()
+
+MaskDict = Dict[str, float]
+
+
+def load_mask_bed(mask_bed: click.Path) -> MaskDict:
+    """
+    Loads the amount of overlap between an aligned region and a mask
+    of low-quality regions. 
+    The key to the returned dict is a composite of alignment query, target and condition.
+    """
+    result = dict()
+    if mask_bed is not None:
+        with Path(mask_bed).open() as fin:
+            for line in fin:
+                rows = line.strip().split("\t")
+                new_key = f"{rows[4]}_{rows[0]}_{rows[3]}"
+                assert new_key not in result
+                result[new_key] = float(rows[8])
+    return result
 
 
 def get_sample_and_condition_name(sam_fname: Path) -> Tuple[str, str]:
@@ -87,7 +97,9 @@ def get_delta_scores(baseline_genes: GeneScores, query_genes: GeneScores) -> Gen
     return result
 
 
-def write_stats(sam_file_list: List[Path], output_stats: Path, gene_lengths):
+def write_stats(
+    sam_file_list: List[Path], output_stats: Path, gene_lengths, mask_overlaps: MaskDict
+):
 
     # First pass: get baseline scores
     baseline_scores: BaselineScores = dict()
@@ -108,6 +120,7 @@ def write_stats(sam_file_list: List[Path], output_stats: Path, gene_lengths):
             "delta_NM",
             "delta_AS",
             "delta_MAPQ",
+            "mask_overlap",
         ]
         stats_file.write("\t".join(fieldnames) + "\n")
 
@@ -116,6 +129,8 @@ def write_stats(sam_file_list: List[Path], output_stats: Path, gene_lengths):
             scores = get_scores(sam_fname, gene_lengths)
             delta_scores = get_delta_scores(baseline_scores[sample], scores)
             for gene in delta_scores:
+                mask_key = f"{gene}_{sample}_{condition}"
+                mask_overlap = mask_overlaps.get(mask_key, 0)
                 row = [
                     sample,
                     gene,
@@ -126,33 +141,36 @@ def write_stats(sam_file_list: List[Path], output_stats: Path, gene_lengths):
                     delta_scores[gene].NM,
                     delta_scores[gene].AS,
                     delta_scores[gene].MAPQ,
+                    mask_overlap,
                 ]
                 stats_file.write("\t".join(map(str, row)) + "\n")
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        usage()
-
-    output_dir = Path(sys.argv[3]).resolve()
+@click.command()
+@click.argument(
+    "input_dir", type=click.Path(exists=True),
+)
+@click.argument("input_bed", type=click.Path(exists=True))
+@click.argument("output_dir", type=str)
+@click.option("--mask_bed", type=click.Path(exists=True), default=None)
+def main(input_dir, input_bed, output_dir, mask_bed):
+    output_dir = Path(output_dir).resolve()
     output_dir.mkdir(exist_ok=True)
     output_stats = output_dir / "stats.tsv"
 
     if not output_stats.exists():
-        input_dir = Path(sys.argv[1]).resolve()
-        input_bed = Path(sys.argv[2]).resolve()
-        for _input in [input_dir, input_bed]:
-            if not _input.exists():
-                print(f"Error: {input_bed} not found")
-                usage()
-
-        sam_file_list = list(input_dir.glob(f"*.sam"))
+        sam_file_list = list(Path(input_dir).glob(f"*.sam"))
         if len(sam_file_list) == 0:
             print(f"Error: no .sam files in {input_dir}")
-            usage()
+            exit(1)
 
-        gene_lengths = load_gene_lengths(input_bed)
+        gene_lengths = load_gene_lengths(Path(input_bed))
+        mask_overlaps = load_mask_bed(mask_bed)
 
-        write_stats(sam_file_list, output_stats, gene_lengths)
+        write_stats(sam_file_list, output_stats, gene_lengths, mask_overlaps)
     else:
         print(f"Found existing {output_stats}, nothing to do. Delete it to regenerate")
+
+
+if __name__ == "__main__":
+    main()
