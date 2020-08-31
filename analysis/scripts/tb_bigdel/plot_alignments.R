@@ -11,7 +11,8 @@ p <- add_argument(p, "gramtools_commit", help="")
 
 plot_ecdf <- function(dataset, output_dir, commit, name){
   ecdf_plot <- ggplot(dataset, aes(x = NM, colour = condition)) + stat_ecdf(geom="step") + 
-    ylab("fraction of sequences") + xlab("edit distance")
+    ylab("fraction of sequences") + xlab("edit distance") + 
+    theme(text=element_text(size = 13))
   fname <- sprintf("ecdf_plot_%s_%s.pdf", commit, name)
   ggsave(file.path(output_dir,fname),width = 9, height = 6, plot=ecdf_plot)
 }
@@ -25,7 +26,7 @@ plot_upset <- function(dataset, output_dir, commit, name){
     replace(is.na(.), 0)
   fname <- sprintf("upset_plot_%s_%s.pdf", commit, name)
   pdf(file=file.path(output_dir,fname),width = 9, height = 6, onefile=FALSE)
-  plot<-upset(as.data.frame(df_long_numeric), sets=,order.by="freq")
+  plot<-upset(as.data.frame(df_long_numeric), sets=,order.by="freq", text.scale=1.4)
   print(plot)
   dev.off()
 }
@@ -63,11 +64,9 @@ library(UpSetR)
 #    - Keeps mapped sequences only (MAPQ is not na)
 #    - Keeps mapped sequences where delta_MAPQ is NA: this means we recover a seq that baseline_ref did not
 #    - Keeps mapped sequences only if delta_MAPQ is not negative: removes worse alignments
-df_mapq_mapped_kept = df_unfiltered %>%
-  filter(!is.na(MAPQ) & (delta_MAPQ >= 0 | is.na(delta_MAPQ)))
 
 plot_upset(df_unfiltered, outdir, gram_commit, "unfiltered")
-plot_upset(df_mapq_mapped_kept, outdir, gram_commit, "filtered_mapq40")
+plot_upset(df_mapq, outdir, gram_commit, "filtered_mapq40")
 plot_upset(df_mask, outdir, gram_commit, "filtered_mask10percent")
 
 
@@ -87,3 +86,4 @@ plot_upset(df_mask, outdir, gram_commit, "filtered_mask10percent")
 
 # Get mean edit distance by condition
 #df %>% group_by(condition) %>% summarise(dist=mean(NM,na.rm=TRUE))
+

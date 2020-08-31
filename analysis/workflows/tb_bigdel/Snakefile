@@ -43,7 +43,6 @@ output_prg_desc = output_base / "prg_descriptions"
 output_alignments = output_base / "alignments"
 output_ref_index = output_alignments / "ref_index"
 output_ref_alignments = output_alignments / "ilmn_alignments_ref"
-output_gene_portions = output_alignments / "gene_portions"
 output_plots = output_base / "plots"
 
 # sed 's/<DEL:.*>/<DEL>/ '
@@ -72,6 +71,8 @@ include: "validate_input_dels.smk"
 include: "genotype.smk"
 
 
+filters = {"callsunfiltered": "", "callsmindepth5": "-i 'DP>5'"}
+
 rule all:
     input:
         genotyped=expand(
@@ -83,7 +84,7 @@ rule all:
         variant_counts=expand(
             f"{output_prg_desc}/{{condition}}_variants.tsv", condition=conditions[0:2]
         ),
-        plots=f"{output_plots}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
+        plots=expand(f"{output_plots}/{{calls}}_upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf", calls = filters.keys()),
 
 
 rule index_pacb_assemblies:
@@ -169,22 +170,28 @@ rule align_induced_gene_seqs_tb_bigdel:
         var_regions=config["beds"]["with_flank"],
         fasta_ref=config["starting_prg"]["fasta_ref"],
     output:
-        alignment_file=f"{output_alignments}/{{condition}}_{{sample}}.sam",
+        alignment_file=f"{output_alignments}/{{calls}}/{{condition}}_{{sample}}.sam",
     params:
-        gene_portions=f"{output_gene_portions}/{{condition}}_{{sample}}.fa",
+        gene_portions=f"{output_alignments}/{{calls}}/gene_portions/{{condition}}_{{sample}}.fa",
         idx_prefix=f"{output_bowtie_indexes}/{{sample}}",
+        applied_filter=lambda wildcards: filters[wildcards.calls],
     resources:
         mem_mb=2000,
+    shadow:
+        "shallow"
     shell:
         """
+        mkdir -p $(dirname {params.gene_portions}) $(dirname {output.alignment_file})
         > {params.gene_portions}
+        bcftools filter {params.applied_filter} {input.result_vcf} -Oz -o used.vcf.gz
+        bcftools index used.vcf.gz
         IFS="\n"; for gene_line in $(cat {input.var_regions})
         do
             IFS="\t"; elems=($gene_line)    
             adjusted_start=$((${{elems[1]}} + 1))
             reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
             gene_name=${{elems[3]}}
-            samtools faidx {input.fasta_ref} $reg | bcftools consensus -s {wildcards.sample} {input.result_vcf} |
+            samtools faidx {input.fasta_ref} $reg | bcftools consensus -s {wildcards.sample} used.vcf.gz |
                 sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
         done
         bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
@@ -194,32 +201,34 @@ rule align_induced_gene_seqs_tb_bigdel:
 rule process_alignments:
     input:
         alignments=expand(
-            f"{output_alignments}/{{condition}}_{{sample}}.sam",
+            f"{output_alignments}/{{calls}}/{{condition}}_{{sample}}.sam",
             condition=conditions,
             sample=SAMPLES,
+            allow_missing=True,
         ),
         var_regions=config["beds"]["with_flank"],
         mask_bed=config["beds"]["ilmn_asm_mask"],
     output:
-        stats=f"{output_plots}/stats.tsv",
-        alignment_mask=f"{output_plots}/alignment_mask_overlap.bed",
+        stats=f"{output_plots}/{{calls}}_stats.tsv",
+        alignment_mask=f"{output_plots}/{{calls}}/alignment_mask_overlap.bed",
     shadow:
         "shallow"
     shell:
         f"""
+        # Compute coverage of mask to alignment intervals
         python3 {config["scripts"]}/{WORKFLOW}/make_alignment_beds.py {output_alignments} alignment.bed
         bedtools coverage -a alignment.bed -b {{input.mask_bed}} > {{output.alignment_mask}}
-        python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots} --mask_bed {{output.alignment_mask}}
+        python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments}/{{wildcards.calls}} {{input.var_regions}} {{output.stats}} --mask_bed {{output.alignment_mask}}
         """
 
 
 rule plot_alignments:
     input:
-        stats=f"{output_plots}/stats.tsv",
+        stats=f"{output_plots}/{{calls}}_stats.tsv",
     output:
         expand(
-            f"{output_plots}/{{plot_name}}_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
-            plot_name=["ecdf", "upset"],
+            f"{output_plots}/{{calls}}_{{plot_name}}_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
+            plot_name=["ecdf", "upset"], allow_missing=True
         ),
     shell:
         f"""

@@ -151,14 +151,13 @@ def write_stats(
     "input_dir", type=click.Path(exists=True),
 )
 @click.argument("input_bed", type=click.Path(exists=True))
-@click.argument("output_dir", type=str)
+@click.argument("output_file", type=str)
 @click.option("--mask_bed", type=click.Path(exists=True), default=None)
-def main(input_dir, input_bed, output_dir, mask_bed):
-    output_dir = Path(output_dir).resolve()
-    output_dir.mkdir(exist_ok=True)
-    output_stats = output_dir / "stats.tsv"
+def main(input_dir, input_bed, output_file, mask_bed):
+    output_file = Path(output_file).resolve()
+    output_file.parent.mkdir(exist_ok=True)
 
-    if not output_stats.exists():
+    if not output_file.exists():
         sam_file_list = list(Path(input_dir).glob(f"*.sam"))
         if len(sam_file_list) == 0:
             print(f"Error: no .sam files in {input_dir}")
@@ -167,9 +166,9 @@ def main(input_dir, input_bed, output_dir, mask_bed):
         gene_lengths = load_gene_lengths(Path(input_bed))
         mask_overlaps = load_mask_bed(mask_bed)
 
-        write_stats(sam_file_list, output_stats, gene_lengths, mask_overlaps)
+        write_stats(sam_file_list, output_file, gene_lengths, mask_overlaps)
     else:
-        print(f"Found existing {output_stats}, nothing to do. Delete it to regenerate")
+        print(f"Found existing {output_file}, nothing to do. Delete it to regenerate")
 
 
 if __name__ == "__main__":
