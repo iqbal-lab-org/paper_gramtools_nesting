@@ -71,7 +71,7 @@ include: "validate_input_dels.smk"
 include: "genotype.smk"
 
 
-filters = {"callsunfiltered": "", "callsmindepth5": "-i 'DP>5'"}
+filters = {"callsunfiltered": "", "callsmindepth5": "-i 'FORMAT/DP>5'"}
 
 rule all:
     input:
@@ -84,7 +84,7 @@ rule all:
         variant_counts=expand(
             f"{output_prg_desc}/{{condition}}_variants.tsv", condition=conditions[0:2]
         ),
-        plots=expand(f"{output_plots}/{{calls}}_upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf", calls = filters.keys()),
+        plots=expand(f"{output_plots}/{{calls}}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf", calls = filters.keys()),
 
 
 rule index_pacb_assemblies:
@@ -227,10 +227,11 @@ rule plot_alignments:
         stats=f"{output_plots}/{{calls}}_stats.tsv",
     output:
         expand(
-            f"{output_plots}/{{calls}}_{{plot_name}}_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
+            f"{output_plots}/{{calls}}/{{plot_name}}_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
             plot_name=["ecdf", "upset"], allow_missing=True
         ),
     shell:
         f"""
-        Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots} {GMTOOLS_COMMIT}
+	mkdir -p {output_plots}/{{wildcards.calls}}
+        Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots}/{{wildcards.calls}} {GMTOOLS_COMMIT}
         """
