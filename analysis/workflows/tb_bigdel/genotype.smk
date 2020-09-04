@@ -97,9 +97,14 @@ rule vg_genotype:
         indexed=f"{output_genotyped}/{conditions[1]}/{{sample}}.vcf.gz.csi",
     params:
         vcf=f"{output_genotyped}/{conditions[1]}/{{sample}}.vcf",
+    shadow:
+        "shallow"
     shell:
         """
-        vg call {input.xg} -k {input.mapped} -v {input.vcf_to_genotype} -r {input.snarls} -s {wildcards.sample} --ploidy 1 > {params.vcf}
+        vg call {input.xg} -k {input.mapped} -v {input.vcf_to_genotype} -r {input.snarls} -s {wildcards.sample} --ploidy 1 > out.vcf
+        bcftools view -h out.vcf > header.txt
+        cat <(head -n-1 header.txt) <(echo '##FORMAT=<ID=FT,Number=1,Type=String,Description="Sample Filter.">') <(tail -n1 header.txt) > new_header.txt
+        bcftools reheader -h new_header.txt -o {params.vcf} out.vcf
         bgzip {params.vcf} && bcftools index {output.gzipped}
         """
 

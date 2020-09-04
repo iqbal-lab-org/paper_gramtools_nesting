@@ -71,7 +71,7 @@ include: "validate_input_dels.smk"
 include: "genotype.smk"
 
 
-filters = {"callsunfiltered": "", "callsmindepth5": "-i 'FORMAT/DP>5'"}
+filters = {"callsunfiltered": "", "callsmindepth5": "-i 'FORMAT/DP>5'", "callsfilterpass": "-i 'FILTER==\"PASS\" || FORMAT/FT==\"PASS\"'"}
 
 rule all:
     input:
