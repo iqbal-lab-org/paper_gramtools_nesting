@@ -22,6 +22,7 @@ if __name__ == "__main__":
     v_stats = pd.read_csv(sys.argv[1], sep="\t")
     c_stats = pd.read_csv(sys.argv[2], sep="\t")
 
+    sns.set(font_scale=1.3)
     combined = pd.concat([v_stats, c_stats])
 
     diff_df_rows = []
@@ -37,7 +38,7 @@ if __name__ == "__main__":
 
     diff_df = pd.DataFrame(diff_df_rows)
     for gene in set(diff_df["gene"]):
-        plt.figure(figsize=(7, 9))
+        plt.figure(figsize=(9.5, 12))
         filtered = diff_df[diff_df["gene"] == gene]
         ax = sns.boxplot(
             data=filtered,

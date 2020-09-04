@@ -2,6 +2,7 @@ import click
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 
 def usage():
@@ -20,14 +21,14 @@ def get_NMs(condition):
             idx1 = els[0]
         if els[1] == "gramtools_genotype":
             idx2 = els[0]
-    return data.loc[idx1]["NM"] - data.loc[idx2]["NM"]
+    return stats_data.loc[idx1]["NM"] - stats_data.loc[idx2]["NM"]
 
 
 def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path):
     mean_metric = stats_data.groupby(["condition"])[metric].mean()
     condition_order = list(mean_metric.sort_values(ascending=False).index)
     for gene in set(stats_data["gene"]):
-        plt.figure(figsize=(10, 7))
+        plt.figure(figsize=(13, 9.5))
         filtered = stats_data[stats_data["gene"] == gene]
         ax = sns.boxplot(
             data=filtered,
@@ -56,18 +57,19 @@ def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path)
 @click.argument("stats_file", type=click.Path(exists=True))
 @click.argument("output_dir", type=click.Path())
 def main(stats_file, output_dir):
+    sns.set(font_scale=1.3)
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(exist_ok=True)
 
-    stats_data = pd.read_table(str(output_stats), sep="\t")
+    stats_data = pd.read_table(str(stats_file), sep="\t")
 
     # gene by condition plots for each metric
     for metric in ["NM", "delta_NM", "AS", "delta_AS"]:
         make_condition_plot(stats_data, metric, output_dir)
 
     ## Distribution of NM change between gramtools genotype and cortex_pers_ref
-    NM_changes = data.groupby(["sample", "gene"])["condition"].agg(get_NMs)
-    NM_changes.to_csv(output_dir / "discov_genotype_NM_diffs.tsv", sep="\t")
+    # NM_changes = stats_data.groupby(["sample", "gene"])["condition"].agg(get_NMs)
+    # NM_changes.to_csv(output_dir / "discov_genotype_NM_diffs.tsv", sep="\t")
 
 
 if __name__ == "__main__":
