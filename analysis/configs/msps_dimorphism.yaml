@@ -2,7 +2,7 @@ pf3k:
     bams_filelist: "analysis/input_data/pfalciparum/pf3k/bam_list.txt"
     bams_basedir: "analysis/input_data/pfalciparum/pf3k/bams"
 
-prg: "analysis/outputs/make_prgs/pf_DBLMSPs/prg_mn5_mml7" # Implies make_prgs workflow has been run on the pf_DBLMSPs gene list
-gene_list_name: "pf_DBLMSPs"
+prg: "analysis/outputs/make_prgs/pf_4surfants/prg_mn5_mml7" # Implies make_prgs workflow has been run on the pf_4surfants gene list
+gene_list_name: "pf_4surfants"
 prg_ref: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta"
 genes_bed: "analysis/input_data/msps_dimorphism/analysed_regions.bed"

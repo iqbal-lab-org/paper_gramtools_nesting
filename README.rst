@@ -8,24 +8,39 @@ Running on cluster
 Requirements for running
 --------------------------
 
-* Snakemake==v5.14.0
-* Singularity>=v3.4.0-1
+* Python >=3.6
+* Singularity>=v3.4.0-1 + root (or `fakeroot <https://sylabs.io/guides/3.5/user-guide/fakeroot.html>`_) privilege for building container
 
 Steps for running
 -------------------
-* Requires singu container image in container/built. Can be built for example running `sudo singularity build container/built/singu.sif container/singu_def.def`. 
-  CAVEATS [TODOs]:
-    * gramtools building is poorly supported. Also, if you want to upgrade version of gramtools in container, fetch/merge and rebuild gramtools from the container, can't just copy a new binary into the container, otherwise get shared library (hts) linking error.
-    * package in requirements.txt not installed in def file yet, but needed for rules that plot notably
 
-* Current working directory when running any workflow should be the git top-level directory(where this file is)
+Setup commands and run commands should always be issued from the root of this project.
+
+Setup a python virtual environment and obtain snakemake::
+    
+    python3 -m venv venv && . venv/bin/activate
+	pip3 install pip==20.0.2 
+    pip3 install snakemake==5.14.0
+
+Build singularity container::
+
+    sudo singularity build container/built/singu.sif container/singu_def.def 
+
+Download input datasets::
+
+    TODO
+
+Run a workflow::
+
+    . venv/bin/activate
+    TODO: below script uses lab's bsub.py and is lsf-specific
+    bash analysis/cluster_submit.sh <workflow_name>
 
 * On ebi cluster: `module load singularity/3.[45].[0-9]`
 
-* Requires  lsf profile for snakemake: https://github.com/Snakemake-Profiles/snakemake-lsf. Requires as in cluster config yaml file is being deprecated.
-The non-defaults configs are: LSF_UNIT_FOR_LIMITS=MB, default_cluster_logdir=run/logs/lsf_profile
+* Requires lsf profile for snakemake: https://github.com/Snakemake-Profiles/snakemake-lsf. 
+    The non-defaults configs are: LSF_UNIT_FOR_LIMITS=MB, default_cluster_logdir=run/logs/lsf_profile
 
-* `bash analysis/cluster_submit.sh workflow_name`
 
 
 Order of running

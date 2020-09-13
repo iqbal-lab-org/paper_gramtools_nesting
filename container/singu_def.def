@@ -1,8 +1,12 @@
-# Usage: `sudo singularity build built/image_name.img singu_def.def`
-# Tested on: singularity v3.4.0-1
-
 BootStrap: docker
-From: ubuntu:latest  
+From: ubuntu:focal  
+
+%setup
+    mkdir ${SINGULARITY_ROOTFS}/setup_files
+%files
+    container/pyrequirements.txt /setup_files
+    container/Rpacks.R /setup_files
+    
 
 %post
     export DEBIAN_FRONTEND=noninteractive
@@ -17,32 +21,33 @@ From: ubuntu:latest
 	pkg-config \
 	python3 \
 	python3-pip \
+    r-base \
 	wget \
 	zlib1g-dev
 
-	pip3 install pip==20.0.2 # upgrade pip
+	# python requirements of repo
+	pip3 install pip==20.0.2 
+	pip3 install -r /setup_files/pyrequirements.txt
 
-
-	# analysis tools
+    # R requirements of repo
+    Rscript /setup_files/Rpacks.R
 
 	## art_ilmn (read simulation)
 	cd ${HOME}
-	ln -s /usr/lib/x86_64-linux-gnu/libgsl.so /usr/lib/x86_64-linux-gnu/libgsl.so.0
-	wget https://www.niehs.nih.gov/research/resources/assets/docs/artsrcmountrainier2016.06.05linux.tgz
-	tar xvf artsrcmountrainier2016.06.05linux.tgz
-	cp art_src_MountRainier_Linux/art_illumina /usr/bin/
-	rm -r artsrcmountrainier2016.06.05linux.tgz art_src_MountRainier_Linux
+    apt-get install -y libgsl-dev
+	wget -qO - https://www.niehs.nih.gov/research/resources/assets/docs/artsrcmountrainier2016.06.05linux.tgz |  tar xz
+	cp art_src_MountRainier_Linux/art_illumina /usr/bin/ && rm -r art_src_MountRainier_Linux
 
 
 	## samtools & bcftools
 	cd ${HOME}
 	apt-get install -y libncurses5-dev libbz2-dev liblzma-dev tabix
-	wget https://github.com/samtools/samtools/releases/download/1.10/samtools-1.10.tar.bz2
-	tar -xf samtools-1.10.tar.bz2 && cd samtools-1.10 && ./configure && make && make install && cd .. && rm -r samtools-1.10
+	wget -qO - https://github.com/samtools/samtools/releases/download/1.10/samtools-1.10.tar.bz2 | tar -xz 
+    cd samtools-1.10 && ./configure && make && make install && cd .. && rm -r samtools-1.10
 
 	cd ${HOME}
-	wget https://github.com/samtools/bcftools/releases/download/1.10.2/bcftools-1.10.2.tar.bz2
-	tar -xf bcftools-1.10.2.tar.bz2 && cd bcftools-1.10.2 && ./configure && make && make install && cd .. && rm -r bcftools-1.10.2
+	wget -qO - https://github.com/samtools/bcftools/releases/download/1.10.2/bcftools-1.10.2.tar.bz2 | tar -xz 
+    cd bcftools-1.10.2 && ./configure && make && make install && cd .. && rm -r bcftools-1.10.2
 	
 
 	## bedtools
@@ -52,7 +57,7 @@ From: ubuntu:latest
 
 	## mafft (multiple seq alignments)
 	cd ${HOME}
-	wget https://mafft.cbrc.jp/alignment/software/mafft_7.450-1_amd64.deb -O mafft && dpkg -i mafft && rm mafft
+	wget https://mafft.cbrc.jp/alignment/software/mafft_7.471-1_amd64.deb -O mafft && dpkg -i mafft && rm mafft
 
 	## RAxML (phylo trees)
 	cd ${HOME}
@@ -65,33 +70,49 @@ From: ubuntu:latest
 	unzip bowtie2-2.4.1-linux-x86_64.zip
 	cp bowtie2-2.4.1-linux-x86_64/bowtie* /usr/bin/ && rm -r bowtie2-2.4.1-linux-x86_64*
 
-	## make_prg
+	## bwa (read to genome alignment)
+	cd ${HOME}
+	wget -O- https://github.com/lh3/bwa/releases/download/v0.7.17/bwa-0.7.17.tar.bz2
+	tar -xf bwa-0.7.17.tar.bz2 && cd bwa-0.7.17 && make && cp bwa /usr/bin
+
+	## minimap2/paftools (assembly to ref alignment)
+	cd ${HOME}
+	curl -L https://github.com/lh3/minimap2/releases/download/v2.17/minimap2-2.17_x64-linux.tar.bz2 | tar -jxf -
+	cd minimap2-2.17_x64-linux && cp minimap2 paftools.js k8 /usr/bin
+
+	## vg (genome graph toolkit)
+	wget -O /usr/bin/ https://github.com/vgteam/vg/releases/download/v1.26.0/vg && chmod u+x /usr/bin/vg
+
+	## graphtyper2 (genome graph toolkit)
+	wget -O /usr/bin/ https://github.com/DecodeGenetics/graphtyper/releases/download/v2.5.1/graphtyper && chmod u+x /usr/bin/graphtyper 
+
+	## make_prg (genome graph construction)
 	cd ${HOME}
 	git clone https://github.com/rmcolq/make_prg.git
 	cd make_prg && git checkout bcd7f7dba42aa29d5fe6a75f9e1c9abd129ae62b
-	python3 setup.py install
+	pip3 install .
+
 
 
 	/*************/
 	/* gramtools */
 	/*************/
-	#apt-get install -y g++-8
-    #ln -sf /usr/bin/g++-8 /usr/bin/g++ # Default to g++-8
-
-	# gramtools::cortex
-	apt-get install -y python python-dev r-base
+	# cortex install. requires py2.7 and python API from source
+	apt-get install -y python python-dev
+    git clone https://github.com/iqbal-lab-org/py-cortex-api
+    python3 py-cortex-api/setup.py install
+    
 
 	cd ${HOME}
 	git clone https://github.com/iqbal-lab-org/gramtools
-	cd gramtools && git checkout 465102ee23d7b7cfbdda4d4c50a86ea8a8e50332
-	mkdir cmake-build-release && cd cmake-build-release
+	cd gramtools && git checkout 80dfb019eb7a223ced2a2985088
+	mkdir build && cd build
 	cmake .. -DCMAKE_BUILD_TYPE=REL_WITH_ASSERTS
-	make -j 4 encode_prg combine_jvcfs
+	make -j 4 gram encode_prg combine_jvcfs
 	cp ../libgramtools/submods/encode_prg.bin /usr/bin/encode_prg
 	cp ../libgramtools/submods/combine_jvcfs.bin /usr/bin/combine_jvcfs
 
-	cd ..
-	pip3 install .	 # Does not work: bin/ and lib/ do not get copied into the install directory.
+	pip3 install -e ..
 
 
 %environment
