@@ -9,9 +9,8 @@ docs
 reproducibility
 ================
 
-[] container: install python env from requirements.txt. See martin's clockwork container setup for how to interact with repo on local filesystem.
-[] R scripts: install all required r packages perhaps as a call to biocManager::install / install.packages, in each script.
-Or make an RScript installing all dependencies in one go, called by singu def file.
+[x] container: install python env from requirements.txt. See martin's clockwork container setup for how to interact with repo on local filesystem.
+[x] container: RScript installing all dependencies in one go, called by singu def file.
 [] Re-run all workflows + add Michael's singularity bind options
 
 tb_bigdel

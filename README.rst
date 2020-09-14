@@ -2,16 +2,16 @@ This is the repository for the gramtools nested variation paper analysis. It is 
 
 They are designed to be run in a cluster environment with a singularity container containing all dependencies. 
 
-Running on cluster
-====================
+Setup
+=======
 
-Requirements for running
+Requirements for setup
 --------------------------
 
 * Python >=3.6
 * Singularity>=v3.4.0-1 + root (or `fakeroot <https://sylabs.io/guides/3.5/user-guide/fakeroot.html>`_) privilege for building container
 
-Steps for running
+Steps for setup
 -------------------
 
 Setup commands and run commands should always be issued from the root of this project.
@@ -19,21 +19,22 @@ Setup commands and run commands should always be issued from the root of this pr
 Setup a python virtual environment and obtain snakemake::
     
     python3 -m venv venv && . venv/bin/activate
-	pip3 install pip==20.0.2 
+    pip3 install pip==20.0.2 
     pip3 install snakemake==5.14.0
 
 Build singularity container::
 
     sudo singularity build container/built/singu.sif container/singu_def.def 
 
-Download input datasets::
+Obtain input data::
 
     TODO
 
-Run a workflow::
+To run a workflow::
 
     . venv/bin/activate
-    TODO: below script uses lab's bsub.py and is lsf-specific
+    TODO: Is ebi cluster + lsf-specific
+    module load singularity/3.5.0
     bash analysis/cluster_submit.sh <workflow_name>
 
 * On ebi cluster: `module load singularity/3.[45].[0-9]`
@@ -43,10 +44,19 @@ Run a workflow::
 
 
 
-Order of running
--------------------
+Order to run workflows in
+---------------------------
 
-Some workflows consume outputs from other workflows.
+make_prgs
+`````````
+Run ::
+   bash analysis/cluster_submit.sh make_prgs
+
+
+In analysis/workflows/make_prgs, at top of Snakefile, there are two `configfile:` directives, pointing to `pfalciparum.yaml` and `mtuberculosis.yaml`. You just ran pfalciparum. Comment out that line, and uncomment the mtuberculosis one.  Run again ::
+   bash analysis/cluster_submit.sh make_prgs
+
+This produces inputs required by `nestedness_simulations`, `pacb_ilmn_validation`, `msps_dimorphism` and `tb_bigdel` workflows.
 
 * pacb_ilmn_validation and msps_dimorphism require make_prgs on plasmodium.yaml config file
 
