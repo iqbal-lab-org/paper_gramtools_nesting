@@ -109,7 +109,6 @@ rule cat_var_portions:
                 fout.write(sequence)
 
 
-
 rule align_to_assemblies:
     input:
         gene_portions=rules.cat_var_portions.output.seqs,

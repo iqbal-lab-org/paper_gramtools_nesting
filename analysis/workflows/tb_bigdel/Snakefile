@@ -13,8 +13,6 @@ VALIDATION_WORKFLOW = "pacb_ilmn_validation"
 
 
 configfile: "analysis/configs/common.yaml"
-
-
 configfile: f"analysis/configs/tb_bigdel.yaml"
 
 
@@ -23,8 +21,6 @@ configfile: f"analysis/configs/tb_bigdel.yaml"
 
 # Include convenience functions
 include: f"../{VALIDATION_WORKFLOW}/utils.py"
-
-
 include: "../common_utils.py"
 
 
@@ -66,12 +62,15 @@ localrules:
 
 # Include rule sets
 include: "validate_input_dels.smk"
-
-
 include: "genotype.smk"
 
 
-filters = {"callsunfiltered": "", "callsmindepth5": "-i 'FORMAT/DP>5'", "callsfilterpass": "-i 'FILTER==\"PASS\" || FORMAT/FT==\"PASS\"'"}
+filters = {
+    "callsunfiltered": "",
+    "callsmindepth5": "-i 'FORMAT/DP>5'",
+    "callsfilterpass": '-i \'FILTER=="PASS" || FORMAT/FT=="PASS"\'',
+}
+
 
 rule all:
     input:
@@ -84,7 +83,10 @@ rule all:
         variant_counts=expand(
             f"{output_prg_desc}/{{condition}}_variants.tsv", condition=conditions[0:2]
         ),
-        plots=expand(f"{output_plots}/{{calls}}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf", calls = filters.keys()),
+        plots=expand(
+            f"{output_plots}/{{calls}}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
+            calls=filters.keys(),
+        ),
 
 
 rule index_pacb_assemblies:
@@ -172,7 +174,9 @@ rule align_induced_gene_seqs_tb_bigdel:
     output:
         alignment_file=f"{output_alignments}/{{calls}}/{{condition}}_{{sample}}.sam",
     params:
-        gene_portions=f"{output_alignments}/{{calls}}/gene_portions/{{condition}}_{{sample}}.fa",
+        gene_portions=(
+            f"{output_alignments}/{{calls}}/gene_portions/{{condition}}_{{sample}}.fa"
+        ),
         idx_prefix=f"{output_bowtie_indexes}/{{sample}}",
         applied_filter=lambda wildcards: filters[wildcards.calls],
     resources:
@@ -228,10 +232,11 @@ rule plot_alignments:
     output:
         expand(
             f"{output_plots}/{{calls}}/{{plot_name}}_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
-            plot_name=["ecdf", "upset"], allow_missing=True
+            plot_name=["ecdf", "upset"],
+            allow_missing=True,
         ),
     shell:
         f"""
-	mkdir -p {output_plots}/{{wildcards.calls}}
-        Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots}/{{wildcards.calls}} {GMTOOLS_COMMIT}
+        mkdir -p {output_plots}/{{wildcards.calls}}
+            Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots}/{{wildcards.calls}} {GMTOOLS_COMMIT}
         """

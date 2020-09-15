@@ -4,10 +4,10 @@ WORKFLOW = "make_prgs"
 
 
 configfile: "analysis/configs/common.yaml"
-
-
 ## Switch from one to the other to build each
 configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
+
+
 # configfile: "analysis/configs/make_prgs/mtuberculosis.yaml"
 
 
@@ -139,7 +139,6 @@ rule cat_var_portions:
                 with open(portion) as fin:
                     sequence = fin.read()
                 fout.write(sequence)
-
 
 
 rule make_msas:

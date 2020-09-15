@@ -3,8 +3,6 @@ from pathlib import Path
 
 
 configfile: "analysis/configs/common.yaml"
-
-
 configfile: "analysis/configs/nestedness_simulations/nestedness_simulations.yaml"
 
 
@@ -12,8 +10,6 @@ container: config["container"]
 
 
 include: "utils.py"
-
-
 include: "../common_utils.py"
 
 

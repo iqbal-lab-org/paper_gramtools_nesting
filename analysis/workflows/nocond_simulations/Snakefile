@@ -3,8 +3,6 @@ from pathlib import Path
 
 
 configfile: "analysis/configs/common.yaml"
-
-
 configfile: "analysis/configs/nocond_simulations.yaml"
 
 

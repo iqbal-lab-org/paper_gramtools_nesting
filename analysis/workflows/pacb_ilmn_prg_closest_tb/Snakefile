@@ -2,13 +2,18 @@ from pathlib import Path
 
 WORKFLOW = "pacb_ilmn_prg_closest_tb"
 
+
 configfile: "analysis/configs/common.yaml"
 configfile: "analysis/configs/tb_bigdel.yaml"
 
+
 container: config["container"]
+
 
 # Get assemblies to process
 include: "../pacb_ilmn_validation/utils.py"
+
+
 ASSEMBLIES = get_samples(config["sample_tsv"])
 
 # Get regions to process. They are not genes, named so for convenience
@@ -17,25 +22,28 @@ with open(config["beds"]["with_flank"]) as fin:
     for line in fin:
         GENES.append(line.strip().split("\t")[3])
 
+
 # regions have '_' in their name, make sure that doesnt get used by assembly wildcard
 wildcard_constraints:
-    assembly='[^_]+', 
+    assembly="[^_]+",
+
 
 # ____Output paths___#
 include: "../common_utils.py"
+
+
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
 output_alignments = output_base / "alignments"
 output_plots = output_base / "plots"
 mk_output_dirs(dir())
 
 # __Input paths__#
-output_bowtie_indexes = Path(
-    f'{config["output_dir"]}/tb_bigdel/bowtie_indexes'
-)
+output_bowtie_indexes = Path(f'{config["output_dir"]}/tb_bigdel/bowtie_indexes')
 input_sequences_dir = Path(f'{config["output_dir"]}/make_prgs/tb_bigdel/msas')
 validation_stats = Path(
     f'{config["output_dir"]}/tb_bigdel/plots/callsunfiltered_stats.tsv'
 )
+
 
 rule all:
     input:
@@ -44,7 +52,7 @@ rule all:
 
 rule align_to_assemblies:
     input:
-        gene_portions=f'{input_sequences_dir}/{{gene}}.fa',
+        gene_portions=f"{input_sequences_dir}/{{gene}}.fa",
         index=expand(
             f"{output_bowtie_indexes}/{{assembly}}.{{ext}}",
             ext=bowtie2_idx_extensions,

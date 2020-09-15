@@ -14,8 +14,6 @@ WORKFLOW = "vg_make_prgs"
 
 
 configfile: "analysis/configs/common.yaml"
-
-
 configfile: "analysis/configs/vg_make_prgs.yaml"
 
 
