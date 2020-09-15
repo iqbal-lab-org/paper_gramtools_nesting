@@ -1,0 +1,109 @@
+from pathlib import Path
+
+WORKFLOW = "pacb_ilmn_prg_closest_tb"
+
+configfile: "analysis/configs/common.yaml"
+configfile: "analysis/configs/tb_bigdel.yaml"
+
+container: config["container"]
+
+# Get assemblies to process
+include: "../pacb_ilmn_validation/utils.py"
+ASSEMBLIES = get_samples(config["sample_tsv"])
+
+# Get regions to process. They are not genes, named so for convenience
+GENES = []
+with open(config["beds"]["with_flank"]) as fin:
+    for line in fin:
+        GENES.append(line.strip().split("\t")[3])
+
+# regions have '_' in their name, make sure that doesnt get used by assembly wildcard
+wildcard_constraints:
+    assembly='[^_]+', 
+
+# ____Output paths___#
+include: "../common_utils.py"
+output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
+output_alignments = output_base / "alignments"
+output_plots = output_base / "plots"
+mk_output_dirs(dir())
+
+# __Input paths__#
+output_bowtie_indexes = Path(
+    f'{config["output_dir"]}/tb_bigdel/bowtie_indexes'
+)
+input_sequences_dir = Path(f'{config["output_dir"]}/make_prgs/tb_bigdel/msas')
+validation_stats = Path(
+    f'{config["output_dir"]}/tb_bigdel/plots/callsunfiltered_stats.tsv'
+)
+
+rule all:
+    input:
+        expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
+
+
+rule align_to_assemblies:
+    input:
+        gene_portions=f'{input_sequences_dir}/{{gene}}.fa',
+        index=expand(
+            f"{output_bowtie_indexes}/{{assembly}}.{{ext}}",
+            ext=bowtie2_idx_extensions,
+            allow_missing=True,
+        ),
+    output:
+        alignment_file=f"{output_alignments}/{{assembly}}_{{gene}}.sam",
+    params:
+        index_prefix=f"{output_bowtie_indexes}/{{assembly}}",
+    shell:
+        """
+        bowtie2 -x {params.index_prefix} -U {input.gene_portions} -f > {output.alignment_file}
+        """
+
+
+rule get_stats:
+    input:
+        alignment_file=f"{output_alignments}/{{assembly}}_{{gene}}.sam",
+        var_bed=config["beds"]["with_flank"],
+    output:
+        stats_file=f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
+    shell:
+        """
+        gene_line=$(grep -w {wildcards.gene} {input.var_bed})
+        IFS="\t"; elems=($gene_line)    
+        gene_len=$((${{elems[2]}} - ${{elems[1]}} + 1))
+        # Hack: these pipes sometimes have non-zero exit code, echo solves it
+        all_NM=$(grep -Eo 'NM:i:[0-9]+' {input.alignment_file} | cut -f 3 -d ':' | sort -n)
+        echo ""
+        best_match=$(echo $all_NM | head -n 1)
+        echo ""
+        best_match_frac=$(echo $best_match / $gene_len | bc -l)
+        echo -e "{wildcards.gene}\t{wildcards.assembly}\t${{best_match_frac}}\tclosest_in_prg"  > {output.stats_file}
+        """
+
+
+rule concat_stats:
+    input:
+        expand(
+            f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
+            assembly=ASSEMBLIES,
+            gene=GENES,
+        ),
+    output:
+        str(output_base / "stats.tsv"),
+    shell:
+        """
+        echo "gene\tsample\tNM\tcondition\n" > {output}
+        cat {input} >> {output}
+        """
+
+
+rule plot_delta_NM:
+    input:
+        closest_prg_stats=rules.concat_stats.output,
+        validation_stats=validation_stats,
+    output:
+        expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
+    params:
+        script=f'{config["scripts"]}/{WORKFLOW}/process_stats.py',
+    shell:
+        f"python3 {{params.script}} {{input.validation_stats}} {{input.closest_prg_stats}} {output_plots}"

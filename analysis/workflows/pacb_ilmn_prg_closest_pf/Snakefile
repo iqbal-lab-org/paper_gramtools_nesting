@@ -6,15 +6,11 @@ This workflow regenerates sequences from vcfs using same rules as make_prgs work
 
 from pathlib import Path
 
-WORKFLOW = "pacb_ilmn_prg_closest"
+WORKFLOW = "pacb_ilmn_prg_closest_pf"
 
 
 configfile: "analysis/configs/common.yaml"
-
-
 configfile: "analysis/configs/pacb_ilmn_validation/pfalciparum.yaml"
-
-
 configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
 
 
