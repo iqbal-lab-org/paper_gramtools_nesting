@@ -30,10 +30,12 @@ Obtain input data::
 
     TODO
 
-To run a workflow::
+How to run a worfklow
+----------------------
+::
 
     . venv/bin/activate
-    TODO: Is ebi cluster + lsf-specific
+    TODO: Below is ebi cluster + lsf-specific
     module load singularity/3.5.0
     bash analysis/cluster_submit.sh <workflow_name>
 
@@ -43,13 +45,14 @@ To run a workflow::
     The non-defaults configs are: LSF_UNIT_FOR_LIMITS=MB, default_cluster_logdir=run/logs/lsf_profile
 
 
-
 Order to run workflows in
----------------------------
+============================
 
 make_prgs
 `````````
+Requires: None
 Run ::
+
    bash analysis/cluster_submit.sh make_prgs
 
 
@@ -58,110 +61,35 @@ In analysis/workflows/make_prgs, at top of Snakefile, there are two `configfile:
 
 This produces inputs required by `nestedness_simulations`, `pacb_ilmn_validation`, `msps_dimorphism` and `tb_bigdel` workflows.
 
-* pacb_ilmn_validation and msps_dimorphism require make_prgs on plasmodium.yaml config file
+nestedness_simulations
+```````````````````````
+Requires: make_prgs on pfalciparum.yaml
 
-* tb_bigdel requires i)make_prgs on mtuberculosis.yaml config file ii)vg_make_prgs
-
-
-Development
-------------
-
-
-This is good once all tools and versions are finalised. While working on the paper, it is not convenient as you have to rebuild and transfer the whole image if anything changes (eg one line in gramtools). For development, it is best therefore to work with a python `venv` at top-level. Then `pip install -r requirements`. Then locate gramtools on cluster, cmake/make it, and `pip install -e` it from inside the `venv`. And in the workflows, comment out `container:` line. All tools must be available on cluster.
-
-
-Workflow details
-====================
-
-Configuration is always done via the workflow yaml file in analysis/configs. If a workflow can use one of several yaml (eg make_prgs), the desired one needs to be used in the workflow's Snakefile.
-
-make_prgs
-----------
-Takes a file with a gene list + a .gff (TODO: OR a bed file of genomic regions) and builds a prg of those regions from a fasta ref + initial vcfs.
-
-Can parameterise `make_prg` with 'max_nesting' and 'min_match_length' to make a set of different prgs for a given region list.
-
+This produces the simulation results of the paper. Because paths in the graphs, and reads from the paths, are randomly simulated, the exact same result will not be produced. I have rerun the workflow once more and confirmed the results in the paper.
 
 pacb_ilmn_validation
----------------------
+`````````````````````
+Requires: make_prgs on pfalciparum.yaml
 
-Takes a PRG, truth assemblies from samples and ilmn reads from the same samples. Makes calls of the samples against the prg/ref genome and validates calls made in regions interest.
-
-Truth assemblies and ilmn read sets should be downloaded before running the workflow. They should be placed in analysis/input_data/{dataset}/pacb_ilmn. For eg for pfalciparum I have download scripts in analysis/input_data/pfalciparum/pacb_ilmn/dl_*.sh
-
-NOTE: the reference genome **cannot be gzipped**, it must be plain fasta, for py-cortex-api to run successfully.
-
-
-pfalciparum
-````````````
-
-I listed the ENA accessions for the ILMN and PACB reads in input/pfalciparum/pacb_ilmn/data_accessions.tsv. Note that when looking for the ILMN sample accessions in the pf3k release 3 metadata file, I find none. The release 3 data is what was used to get variants by cortex and thus to make the starting_prg. In pf3k release 5 metadata, I do find 3 accessions: ERS740936 (KH02), ERS740937(KE01) and ERS740940(GN01). 
-
-
-
-nocond_simulations
--------------------
-
-This is to simulate paths in a given prg and genotype them, without comparing conditions (such as PRG nestedness).
-It can be used to evaluate changes in performance when changing, for eg, the genotyping model.
-
-
-
-nestedness_simulations
------------------------
-
-This is to simulate paths through a nested (resp. non-nested prg), thread them through a non-nested (resp. nested) prg,
-and compare performance between the two conditions.
-
-I manually spotted a site which has striking coverage differences between nested and no nested: site index 579 in nested DBLMSP2, which corresponds to site index 267 in no nested DBLMSP2.
-
-Find index from POS:
-```jq '.Sites[] | .POS' gtyped.json | awk '{if ($1==my_pos){print NR-1}}' ```
-
-Find corresponding site given REF sequence of site allele: 
-``` jq '.Sites[] | select(.ALS[] | contains("my_allele"))' gtyped.json```
-
-Plasmodium DBLMSPs
-```````````````````
-
-Here is the output of concat_prg.py on the non_nested (mn1_mml7) data:
-```
-INFO:root:Processing: DBLMSP
-INFO:root:Cumulative len prg: 37304
-INFO:root:Cumulative num sites: 454
-
-INFO:root:Processing: nonvar_12
-INFO:root:Cumulative len prg: 44508
-INFO:root:Cumulative num sites: 454
-
-INFO:root:Processing: DBLMSP2
-INFO:root:Cumulative len prg: 100720
-INFO:root:Cumulative num sites: 872
-```
-
-And for the nested equivalent (mn5_mml7):
-
-```
-INFO:root:Processing: DBLMSP
-INFO:root:Cumulative len prg: 23676
-INFO:root:Cumulative num sites: 815
-
-INFO:root:Processing: nonvar_12
-INFO:root:Cumulative len prg: 30880
-INFO:root:Cumulative num sites: 815
-
-INFO:root:Processing: DBLMSP2
-INFO:root:Cumulative len prg: 68680
-INFO:root:Cumulative num sites: 1717
-```
-
---> Nested prg has 1.96 x more variant sites, and 0.68 x the num of characters!
+This produces part of the genotyping in DBLMSP2 results of the paper: performance of gramtools compared to ref-based variant callers.
 
 
 msps_dimorphism
------------------
+`````````````````
+Requires: make_prgs on pfalciparum.yaml
 
-This is to analyse dimorphisms in DBLMSP1 and DBLMSP2 from pf3k genotyped samples on the DBLMSP prg.
+This produces the dimorphism in DBLMSP2 results of the paper.
 
 
+tb_bigdel
+``````````
+Requires: make_prgs on mtuberculosis.yaml ; vg_make_prgs
+
+This produces the benchmark results of the paper: analysis of large deletions and small variants under them in M. tuberculosis with comparison to vg and graphtyper2.
+
+
+Development
+============
+
+While working on the paper, it is not convenient as you have to rebuild and transfer the whole container image if anything changes (eg one line in gramtools). For development, it is best to work with a python `venv` at top-level. Then `pip install -r pyrequirements.txt` and `pip install -r container/pyrequirements.txt`. Then locate gramtools on cluster, cmake/make it, and `pip install -e` it from inside the `venv`. And in the workflows, comment out `container:` line. All tools must be available on cluster.
 

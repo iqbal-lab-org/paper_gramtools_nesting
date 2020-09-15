@@ -52,6 +52,8 @@ rule align_to_assemblies:
         ),
     output:
         alignment_file=f"{output_alignments}/{{assembly}}_{{gene}}.sam",
+    resources:
+        mem_mb=5000,
     params:
         index_prefix=f"{output_bowtie_indexes}/{{assembly}}",
     shell:
@@ -71,12 +73,12 @@ rule get_stats:
         gene_line=$(grep -w {wildcards.gene} {input.var_bed})
         IFS="\t"; elems=($gene_line)    
         gene_len=$((${{elems[2]}} - ${{elems[1]}} + 1))
-        # Hack: these pipes sometimes have non-zero exit code, echo solves it
-        all_NM=$(grep -Eo 'NM:i:[0-9]+' {input.alignment_file} | cut -f 3 -d ':' | sort -n)
-        echo ""
+        all_NM=$(grep -Eo 'NM:i:[0-9]+' {input.alignment_file} || true)
+        if [[ -n $all_NM ]]; then all_NM=$(echo $all_NM | cut -f3 -d ':' | sort -n); fi
         best_match=$(echo $all_NM | head -n 1)
-        echo ""
-        best_match_frac=$(echo $best_match / $gene_len | bc -l)
+        if [[ -z $best_match ]]; then best_match_frac="NA"
+        else best_match_frac=$(echo "print(${{best_match}}/${{gene_len}})" | python3)
+        fi
         echo -e "{wildcards.gene}\t{wildcards.assembly}\t${{best_match_frac}}\tclosest_in_prg"  > {output.stats_file}
         """
 
@@ -92,7 +94,7 @@ rule concat_stats:
         str(output_base / "stats.tsv"),
     shell:
         """
-        echo "gene\tsample\tNM\tcondition\n" > {output}
+        echo "gene\tsample\tNM\tcondition" > {output}
         cat {input} >> {output}
         """
 
@@ -104,6 +106,6 @@ rule plot_delta_NM:
     output:
         expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
     params:
-        script=f'{config["scripts"]}/{WORKFLOW}/process_stats.py',
+        script=f'{config["scripts"]}/pacb_ilmn_prg_closest/process_stats.py',
     shell:
         f"python3 {{params.script}} {{input.validation_stats}} {{input.closest_prg_stats}} {output_plots}"
