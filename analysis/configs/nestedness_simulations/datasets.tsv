@@ -1,5 +1,5 @@
 name	nesting	base_path	genome_ref	coords
-DBLMSP	nested	analysis/outputs/make_prgs/pf_DBLMSPs/prgs/mn5_mml7/DBLMSP.bin	analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta	Pf3D7_10_v3:1408200-1420293
-DBLMSP	nonested	analysis/outputs/make_prgs/pf_DBLMSPs/prgs/mn1_mml7/DBLMSP.bin	analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta	Pf3D7_10_v3:1408200-1420293
-DBLMSP2	nested	analysis/outputs/make_prgs/pf_DBLMSPs/prgs/mn5_mml7/DBLMSP2.bin	analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta	Pf3D7_10_v3:1427498-1439786
-DBLMSP2	nonested	analysis/outputs/make_prgs/pf_DBLMSPs/prgs/mn1_mml7/DBLMSP2.bin	analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta	Pf3D7_10_v3:1427498-1439786
+DBLMSP	nested	analysis/outputs/make_prgs/pf_4surfants/prgs/mn5_mml7/DBLMSP.bin	analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta	Pf3D7_10_v3:1408200-1420293
+DBLMSP	nonested	analysis/outputs/make_prgs/pf_4surfants/prgs/mn1_mml7/DBLMSP.bin	analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta	Pf3D7_10_v3:1408200-1420293
+DBLMSP2	nested	analysis/outputs/make_prgs/pf_4surfants/prgs/mn5_mml7/DBLMSP2.bin	analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta	Pf3D7_10_v3:1427498-1439786
+DBLMSP2	nonested	analysis/outputs/make_prgs/pf_4surfants/prgs/mn1_mml7/DBLMSP2.bin	analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta	Pf3D7_10_v3:1427498-1439786

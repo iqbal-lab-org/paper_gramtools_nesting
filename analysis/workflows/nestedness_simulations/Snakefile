@@ -43,7 +43,7 @@ rule gram_build:
     input:
         prg=get_prg_path,
     output:
-        f"{output_build}/{{dataset}}_{{nesting}}/prg",
+        prg=f"{output_build}/{{dataset}}_{{nesting}}/prg",
     params:
         genome=get_genome_path,
         coords=get_coords,
@@ -63,7 +63,8 @@ rule gram_build:
 
 rule simulate_paths:
     input:
-        get_prg_paths,
+        nested_prg=f"{output_build}/{{dataset}}_nested/prg",
+        nonested_prg=f"{output_build}/{{dataset}}_nonested/prg",
     output:
         expand(
             f"{output_paths}/{{dataset}}_{{nesting}}.json",
@@ -79,10 +80,10 @@ rule simulate_paths:
         num_paths=config["num_simu_paths"],
         paths_dir=f"{output_paths}/all_paths",
     shell:
-        "gramtools simulate --prg {input[0]} -o {params.output_dir} --sample_id {wildcards.dataset} -n {params.num_paths} --force;"
+        "gramtools simulate --prg {input.nonested_prg} -o {params.output_dir} --sample_id {wildcards.dataset} -n {params.num_paths} --force;"
         "mv {params.output_dir}/{wildcards.dataset}.json {params.output_dir}/{params.sample_ids[0]}.json;"
         "mv {params.output_dir}/{wildcards.dataset}.fasta {params.output_dir}/{params.sample_ids[0]}.fasta;"
-        "gramtools simulate --prg {input[1]} -o {params.output_dir} --sample_id {wildcards.dataset} -i {output.simu_fasta} --force;"
+        "gramtools simulate --prg {input.nested_prg} -o {params.output_dir} --sample_id {wildcards.dataset} -i {output.simu_fasta} --force;"
         "mv {params.output_dir}/{wildcards.dataset}.json {params.output_dir}/{params.sample_ids[1]}.json;" # The `mv`s are because we want the JSON sample names to only have dataset in name, but the filenames to also have the nesting condition
 
 
@@ -118,7 +119,7 @@ rule simulate_reads:
         "rm {params.output_dir}/{wildcards.num}.aln"
 
 
-rule genotype:
+rule simu_genotype:
     input:
         reads=f"{output_reads}/{{dataset}}/e{{err}}_c{{cov}}/{{num}}.fq",
         gram_build=f"{output_build}/{{dataset}}_{{nesting}}/prg",
@@ -139,7 +140,7 @@ rule genotype:
         "mv {params.output_dir}/genotype/genotyped.json {output}"
 
 
-rule evaluate:
+rule simu_evaluate:
     input:
         res_json=f"{output_gtyping}/{{dataset}}/e{{err}}_c{{cov}}/{{nesting}}/{{num}}_genotyped.json",
         truth_json=f"{output_paths}/{{dataset}}_{{nesting}}.json",
@@ -180,7 +181,7 @@ rule aggregate:
         "cat {input} >> {output}"
 
 
-rule plot:
+rule simu_plot:
     input:
         to_eval=rules.aggregate.output,
     output:

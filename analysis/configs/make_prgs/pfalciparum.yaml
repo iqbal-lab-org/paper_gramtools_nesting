@@ -8,8 +8,8 @@ genome_fai: "analysis/input_data/pfalciparum/ref_genome/Pfalciparum.genome.fasta
 initial_bed: "analysis/input_data/make_prgs/beds/pf_4surfants.bed" # made from script analysis/input_data/make_prgs/beds/scripts/make_initial_beds.sh
 
 vcf_list: "analysis/input_data/pfalciparum/pf3k/vcf_list.txt"
-#vcf_prefix: "/nfs/research1/zi/mirror/oxford/cycloid/data3/projects/pf3k/discovery_gt/release3_for_first_paper" # noah
-vcf_prefix: "/nfs/leia/research/iqbal/mirror2/oxford/cycloid/data3/pf3k/discovery_gt/release3_for_first_paper/release3_for_first_paper" # yoda
+vcf_prefix: "/nfs/research1/zi/mirror/oxford/cycloid/data3/projects/pf3k/discovery_gt/release3_for_first_paper" # noah
+  #vcf_prefix: "/nfs/leia/research/iqbal/mirror2/oxford/cycloid/data3/pf3k/discovery_gt/release3_for_first_paper/release3_for_first_paper" # yoda
 
 
 make_prg:

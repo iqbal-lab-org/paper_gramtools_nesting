@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eu
+set -e
 
 WORKFLOW=$1
 
@@ -11,7 +11,12 @@ function usage(){
 
 if [[ -z ${WORKFLOW} ]]; then usage; fi
 
-SINGULARITY_BINDS="/hps/nobackup2/iqbal,/nfs/leia/research/iqbal"
+if [[ -z ${TMPDIR} ]]; then TMPDIR="/hps/nobackup/research/iqbal/bletcher/tmp"; fi
+
+# Reduced set of mount points to speed up singularity execution
+# mafft requires a writable /scratch directory
+SINGULARITY_BINDS="/hps/nobackup/research/iqbal,/nfs/research1/zi,${TMPDIR}:/scratch"
+#SINGULARITY_BINDS="/hps/nobackup2/iqbal,/nfs/leia/research/iqbal,${TMPDIR}:/scratch" # yoda
 SINGULARITY_ARGS="--contain --bind $SINGULARITY_BINDS"
 
 LOG_DIR="analysis/logs"

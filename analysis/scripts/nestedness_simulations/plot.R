@@ -3,6 +3,8 @@
 library(ggplot2)
 library(tibble)
 library(dplyr)
+library(readr)
+library(purrr)
 library(argparser, quietly=TRUE)
 library(rjson)
 

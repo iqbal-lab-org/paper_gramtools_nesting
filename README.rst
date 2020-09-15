@@ -20,7 +20,7 @@ Setup a python virtual environment and obtain snakemake::
     
     python3 -m venv venv && . venv/bin/activate
     pip3 install pip==20.0.2 
-    pip3 install snakemake==5.14.0
+    pip3 install -r pyrequirements.txt
 
 Build singularity container::
 
