@@ -68,7 +68,7 @@ rule build:
         "gramtools build --prg {input.prg} --ref {input.ref} --gram_dir {output_gram_build} --kmer_size 10 --force"
 
 
-rule genotype:
+rule msps_genotype:
     input:
         gram_build_done=rules.build.output[0],
         reads=f'{config["pf3k"]["bams_basedir"]}/{{sample}}.bam',
@@ -115,7 +115,7 @@ rule make_seq_slices:
     input:
         prg_ref=config["prg_ref"],
         genes_bed=config["genes_bed"],
-        sample_vcf=rules.genotype.output.vcf,
+        sample_vcf=rules.msps_genotype.output.vcf,
     output:
         sequences=expand(
             f"{output_sequences}/{{gene}}/{{sample}}.fa", gene=genes, allow_missing=True

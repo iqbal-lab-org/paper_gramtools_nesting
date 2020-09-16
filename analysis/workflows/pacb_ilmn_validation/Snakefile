@@ -140,7 +140,7 @@ rule samtools_baseline_ref:
         "bash {params.samtools_script} {input.fasta_ref} '{input.reads_files}' {output.out_vcf} {threads}"
 
 
-rule gramtools_genotype:
+rule pacb_ilmn_validation_gramtools_genotype:
     input:
         gram_build_completed=rules.gram_build.output,
         gram_dir=f"{Path(rules.gram_build.output[0]).parent}",
@@ -158,7 +158,7 @@ rule gramtools_genotype:
         mem_mb=10000,
     shell:
         """
-        gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --force
+        gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --seed 42 --force
         cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.out_vcf}
         bcftools index {output.out_vcf}
         """
@@ -167,7 +167,7 @@ rule gramtools_genotype:
 rule cortex_pers_ref:
     input:
         sample_geno_dir=f"{output_gramtools_genotype}/{{sample}}",
-        geno_vcf=rules.gramtools_genotype.output.out_vcf,
+        geno_vcf=rules.pacb_ilmn_validation_gramtools_genotype.output.out_vcf,
     output:
         out_vcf=f"{output_gene_list}/{vcf_outputs_dirs[3]}/{{sample}}.vcf.gz",
         sample_discov_dir=directory(f"{output_cortex_pers_ref}/{{sample}}"),
@@ -188,7 +188,7 @@ rule cortex_pers_ref:
 rule samtools_pers_ref:
     input:
         reads_files=get_reads,
-        pers_ref=rules.gramtools_genotype.output.pers_ref,
+        pers_ref=rules.pacb_ilmn_validation_gramtools_genotype.output.pers_ref,
     output:
         out_vcf=f"{output_gene_list}/{vcf_outputs_dirs[4]}/{{sample}}.vcf.gz",
         bcftools_index=f"{output_samtools_pers_ref}/{{sample}}.vcf.gz.csi",

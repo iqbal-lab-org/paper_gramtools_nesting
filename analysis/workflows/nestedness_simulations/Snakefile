@@ -132,7 +132,7 @@ rule simu_genotype:
     shell:
         "mkdir -p {params.output_dir};"
         "gramtools genotype -i {params.build_dir} -o {params.output_dir}"
-        " --reads {input.reads} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --force --debug;"
+        " --reads {input.reads} --sample_id {wildcards.dataset}{wildcards.num} --ploidy haploid --seed 42 --force --debug;"
         "mv {params.output_dir}/genotype/genotyped.json {output}"
 
 

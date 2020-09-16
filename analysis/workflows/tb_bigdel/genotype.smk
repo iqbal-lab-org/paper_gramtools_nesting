@@ -30,7 +30,7 @@ rule gramtools_genotype:
         mem_mb=10000,
     shell:
         """
-        gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --force
+        gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --seed 42 --force
         cp {output.sample_geno_dir}/genotype/genotyped.vcf.gz {output.gzipped}
         bcftools index {output.gzipped}
         bcftools filter -i 'FT!="AMBIG"' {output.gzipped} -Oz -o tmp.vcf.gz

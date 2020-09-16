@@ -5,6 +5,7 @@ from subprocess import run as sp_run, PIPE
 def get_gmtools_commit():
     """Get gramtools commit version through venv/singularity container it is installed in"""
     gmtools_commit_script = Path(config["scripts"]) / "gmtools_commit.py"
+    gmtools_commit_script = str(gmtools_commit_script.resolve())
     try:  # Try in virtual environment first
         GMTOOLS_COMMIT = sp_run(
             ["python3", gmtools_commit_script],
@@ -17,7 +18,7 @@ def get_gmtools_commit():
             [
                 "singularity",
                 "exec",
-                config["container"],
+                str(Path(config["container"]).resolve()),
                 "python3",
                 gmtools_commit_script,
             ],
