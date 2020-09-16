@@ -19,6 +19,10 @@ SINGULARITY_BINDS="/hps/nobackup/research/iqbal,/nfs/research1/zi,${TMPDIR}:/scr
 #SINGULARITY_BINDS="/hps/nobackup2/iqbal,/nfs/leia/research/iqbal,${TMPDIR}:/scratch" # yoda
 SINGULARITY_ARGS="--contain --bind $SINGULARITY_BINDS"
 
+# In case snakemake --singularity-args fails, can use environment variables too
+export SINGULARITY_CONTAIN=TRUE
+export SINGULARITY_BINDPATH="$SINGULARITY_BINDS"
+
 LOG_DIR="analysis/logs"
 MEMORY=5000
 
