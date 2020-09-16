@@ -34,12 +34,18 @@ include: "../common_utils.py"
 
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
 output_alignments = output_base / "alignments"
+output_prelim_stats = output_base / "prelim_stats"
+output_indexes = output_base / "indexes"
+output_fastas = output_indexes / "fasta"
+output_prgs = output_indexes / "prgs"
+output_induced = output_base / "induced"
 output_plots = output_base / "plots"
 mk_output_dirs(dir())
 
 # __Input paths__#
 output_bowtie_indexes = Path(f'{config["output_dir"]}/tb_bigdel/bowtie_indexes')
 input_sequences_dir = Path(f'{config["output_dir"]}/make_prgs/tb_bigdel/msas')
+input_prgs_dir = Path(f'{config["output_dir"]}/make_prgs/tb_bigdel/prgs/mn5_mml7')
 validation_stats = Path(
     f'{config["output_dir"]}/tb_bigdel/plots/callsunfiltered_stats.tsv'
 )
@@ -49,6 +55,32 @@ rule all:
     input:
         expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
 
+rule index_input_seqs:
+    input:
+        gene_portions=f"{input_sequences_dir}/{{gene}}.fa",
+    output:
+        fa=f"{output_fastas}/{{gene}}.fa",
+        fai=f"{output_fastas}/{{gene}}.fa.fai",
+    shell:
+        """
+        cp {input} {output.fa}
+        samtools faidx {output.fa}
+        """
+
+rule index_input_prg:
+    input:
+        prg=f"{input_prgs_dir}/{{gene}}.bin",
+    output:
+        prg=f"{output_prgs}/{{gene}}",
+    params:
+        concat_prg_script=f'{config["scripts"]}/make_prgs/concat_prgs.py',
+    shadow:
+        "shallow"
+    shell:
+        f"""
+        echo -e "\t\t\t{{wildcards.gene}}" > to_concat.txt
+        python3 {{params.concat_prg_script}} {input_prgs_dir} to_concat.txt {{output.prg}}
+        """
 
 rule align_to_assemblies:
     input:
@@ -75,19 +107,39 @@ rule get_stats:
         alignment_file=f"{output_alignments}/{{assembly}}_{{gene}}.sam",
         var_bed=config["beds"]["with_flank"],
     output:
-        stats_file=f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
+        stats_file=f"{output_prelim_stats}/{{assembly}}_{{gene}}.tsv",
+    params:
+        script=f'{config["scripts"]}/pacb_ilmn_prg_closest/process_alignments.py',
     shell:
         """
-        gene_line=$(grep -w {wildcards.gene} {input.var_bed})
-        IFS="\t"; elems=($gene_line)    
-        gene_len=$((${{elems[2]}} - ${{elems[1]}} + 1))
-        all_NM=$(grep -Eo 'NM:i:[0-9]+' {input.alignment_file} || true)
-        if [[ -n $all_NM ]]; then all_NM=$(echo $all_NM | cut -f3 -d ':' | sort -n); fi
-        best_match=$(echo $all_NM | head -n 1)
-        if [[ -z $best_match ]]; then best_match_frac="NA"
-        else best_match_frac=$(echo "print(${{best_match}}/${{gene_len}})" | python3)
-        fi
-        echo -e "{wildcards.gene}\t{wildcards.assembly}\t${{best_match_frac}}\tclosest_in_prg"  > {output.stats_file}
+        python3 {params.script} {input.alignment_file} {input.var_bed} {output}
+        """
+
+rule gramtools_induce_in_prg:
+    input:
+        stats_file=f"{output_prelim_stats}/{{assembly}}_{{gene}}.tsv",
+        fa=f"{output_fastas}/{{gene}}.fa",
+        prg=f"{output_prgs}/{{gene}}",
+    output:
+        stats_file=f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
+    params:
+        odir=output_induced,
+    shadow:
+        "shallow"
+    shell:
+        """
+        IFS="\n"; for line in $(cat {input.stats_file})
+        do
+            IFS="\t"; elems=($line); seq_name=${{elems[4]}}; condition=${{elems[3]}}
+            newline=$(echo ${{elems[@]}} | tr ' ' '\t' | tr -d '\n')
+            if [[ $seq_name == "NA" ]]; then
+                echo -e "${{newline}}\t0" > {output}
+            else
+                samtools faidx {input.fa} ${{seq_name}} > best.fa
+                gramtools simulate --prg {input.prg} -i best.fa --sample_id {wildcards.assembly}_{wildcards.gene}_${{condition}} -o {params.odir} --force
+                echo -e "${{newline}}\t1" > {output}
+            fi
+        done
         """
 
 
@@ -102,7 +154,7 @@ rule concat_stats:
         str(output_base / "stats.tsv"),
     shell:
         """
-        echo "gene\tsample\tNM\tcondition" > {output}
+        echo "gene\tsample\tNM\tcondition\tquery\tfound_in_prg" > {output}
         cat {input} >> {output}
         """
 
