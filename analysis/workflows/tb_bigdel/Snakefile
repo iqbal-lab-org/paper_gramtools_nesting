@@ -57,7 +57,7 @@ ref_name = Path(config["starting_prg"]["fasta_ref"]).stem
 
 localrules:
     all,
-    baseline_ref_genotype,
+    tb_baseline_ref_genotype,
 
 
 # Include rule sets
@@ -111,7 +111,7 @@ rule index_reference:
         f'bowtie2-build {config["starting_prg"]["fasta_ref"]} {output_ref_index}/{ref_name}'
 
 
-rule map_reads_to_ref:
+rule tb_map_reads_to_ref:
     """Used by graphtyper genotyper and for manually validating some input dels"""
     input:
         reads_files=get_reads,
@@ -161,7 +161,7 @@ rule describe_jvcf_prg:
         "python3 {params.script} {input.gram_jvcf} {input.input_regions} {output.desc}"
 
 
-rule align_induced_gene_seqs_tb_bigdel:
+rule tb_align_induced_gene_seqs:
     input:
         truth_ref_idx=expand(
             f"{output_bowtie_indexes}/{{sample}}.{{ext}}",
@@ -202,7 +202,7 @@ rule align_induced_gene_seqs_tb_bigdel:
         """
 
 
-rule process_alignments:
+rule tb_process_alignments:
     input:
         alignments=expand(
             f"{output_alignments}/{{calls}}/{{condition}}_{{sample}}.sam",
@@ -226,7 +226,7 @@ rule process_alignments:
         """
 
 
-rule plot_alignments:
+rule tb_plot_alignments:
     input:
         stats=f"{output_plots}/{{calls}}_stats.tsv",
     output:

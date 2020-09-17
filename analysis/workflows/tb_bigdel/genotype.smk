@@ -1,4 +1,4 @@
-rule gram_build:
+rule tb_gram_build:
     input:
         prg=config["starting_prg"]["gram_prg"],
         ref=config["starting_prg"]["fasta_ref"],
@@ -15,9 +15,9 @@ rule gram_build:
         """
 
 
-rule gramtools_genotype:
+rule tb_gramtools_genotype:
     input:
-        gram_build_completed=rules.gram_build.output,
+        gram_build_completed=rules.tb_gram_build.output,
         gram_dir=f"{Path(rules.gram_build.output[0]).parent}",
         reads_files=get_reads,
     output:
@@ -38,7 +38,7 @@ rule gramtools_genotype:
         """
 
 
-rule vg_build:
+rule tb_vg_build:
     input:
         vg_graph=config["starting_prg"]["vg_prg"],
     output:
@@ -63,7 +63,7 @@ rule vg_build:
         """
 
 
-rule vg_map:
+rule tb_vg_map:
     input:
         xg=rules.vg_build.output.xg,
         gcsa=rules.vg_build.output.gcsa,
@@ -86,10 +86,10 @@ rule vg_map:
         """
 
 
-rule vg_genotype:
+rule tb_vg_genotype:
     input:
         xg=rules.vg_build.output.xg,
-        mapped=rules.vg_map.output.mapped_packed,
+        mapped=rules.tb_vg_map.output.mapped_packed,
         snarls=rules.vg_build.output.snarls,
         vcf_to_genotype=config["vcf_to_genotype"],
     output:
@@ -109,7 +109,7 @@ rule vg_genotype:
         """
 
 
-rule baseline_ref_genotype:
+rule tb_baseline_ref_genotype:
     """Dummy rule producing empty vcfs used for baseline gene portion-assembly alignments"""
     input:
         vcf=config["vcf_template"],
@@ -126,7 +126,7 @@ rule baseline_ref_genotype:
         """
 
 
-rule graphtyper_genotype:
+rule tb_graphtyper_genotype:
     input:
         bam=f"{output_ref_alignments}/{{sample}}.bam",
         var_regions=config["beds"]["with_flank"],
@@ -162,9 +162,9 @@ rule graphtyper_genotype:
         """
 
 
-rule graphtyper_postprocess:
+rule tb_graphtyper_postprocess:
     input:
-        vcf=rules.graphtyper_genotype.output.vcf,
+        vcf=rules.tb_graphtyper_genotype.output.vcf,
     output:
         gzipped=f"{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz",
         indexed=f"{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz.csi",
