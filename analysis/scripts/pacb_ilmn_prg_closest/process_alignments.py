@@ -15,9 +15,10 @@ def get_gene_and_sample_name(sam_fname: Path) -> Tuple[str, str]:
 
 
 class BestRead:
-    def __init__(self, min_mapq: int = 0):
+    def __init__(self, min_mapq: int = 0, min_qlen: int = 0):
         self.min_mapq = min_mapq
         self.best_read = None
+        self.min_qlen = min_qlen
 
     def best_NM(self):
         if self.best_read is None:
@@ -40,6 +41,8 @@ class BestRead:
 
     def update(self, read: AlignedSegment):
         try:
+            if read.qlen < self.min_qlen:
+                return
             read_NM = read.get_tag("NM")
             if read.mapping_quality <= self.min_mapq:
                 return
@@ -61,8 +64,17 @@ class BestRead:
 )
 @click.argument("input_bed", type=click.Path(exists=True))
 @click.argument("output_file", type=str)
-def main(sam_fname, input_bed, output_file):
-    best_reads = [BestRead(min_mapq=0), BestRead(min_mapq=40)]
+@click.option(
+    "--min_qlen",
+    type=int,
+    help="minimum length of mapped query to be considered",
+    default=0,
+)
+def main(sam_fname, input_bed, output_file, min_qlen):
+    best_reads = [
+        BestRead(min_mapq=0, min_qlen=min_qlen),
+        BestRead(min_mapq=40, min_qlen=min_qlen),
+    ]
     samfile = AlignmentFile(sam_fname, "r")
     for read in samfile.fetch(until_eof=True):
         for best_read in best_reads:

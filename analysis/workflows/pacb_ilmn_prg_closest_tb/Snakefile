@@ -31,6 +31,7 @@ wildcard_constraints:
 # ____Output paths___#
 include: "../common_utils.py"
 
+GMTOOLS_COMMIT = get_gmtools_commit()
 
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
 output_alignments = output_base / "alignments"
@@ -39,6 +40,7 @@ output_indexes = output_base / "indexes"
 output_fastas = output_indexes / "fasta"
 output_prgs = output_indexes / "prgs"
 output_induced = output_base / "induced"
+output_eval = output_base / "eval_jvcf" / f"gramtools_{GMTOOLS_COMMIT}"
 output_plots = output_base / "plots"
 mk_output_dirs(dir())
 
@@ -49,11 +51,20 @@ input_prgs_dir = Path(f'{config["output_dir"]}/make_prgs/tb_bigdel/prgs/mn5_mml7
 validation_stats = Path(
     f'{config["output_dir"]}/tb_bigdel/plots/callsunfiltered_stats.tsv'
 )
+gramtools_genotyped = Path(f'{config["output_dir"]}/tb_bigdel/genotyped/gramtools_{GMTOOLS_COMMIT}')
+
+# __Genomic regions__'
+regions = dict()
+with open(config["beds"]["with_flank"]) as fin:
+   for line in fin:
+        elems = line.strip().split("\t") 
+        regions[elems[3]] = f'{elems[0]}:{int(elems[1])+1}-{elems[2]}'
 
 
 rule all:
     input:
-        expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
+        str(output_base / "closest_stats.tsv"),
+        str(output_base / "eval_stats.tsv"),
 
 rule index_input_seqs:
     input:
@@ -112,16 +123,17 @@ rule get_stats:
         script=f'{config["scripts"]}/pacb_ilmn_prg_closest/process_alignments.py',
     shell:
         """
-        python3 {params.script} {input.alignment_file} {input.var_bed} {output}
+        python3 {params.script} --min_qlen 500 {input.alignment_file} {input.var_bed} {output}
         """
 
-rule gramtools_induce_in_prg:
+rule tb_gramtools_induce_in_prg:
     input:
         stats_file=f"{output_prelim_stats}/{{assembly}}_{{gene}}.tsv",
         fa=f"{output_fastas}/{{gene}}.fa",
         prg=f"{output_prgs}/{{gene}}",
     output:
         stats_file=f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
+        json_file=f"{output_induced}/{{assembly}}_{{gene}}_closest_in_prg_mapq_40.json",
     params:
         odir=output_induced,
     shadow:
@@ -133,11 +145,12 @@ rule gramtools_induce_in_prg:
             IFS="\t"; elems=($line); seq_name=${{elems[4]}}; condition=${{elems[3]}}
             newline=$(echo ${{elems[@]}} | tr ' ' '\t' | tr -d '\n')
             if [[ $seq_name == "NA" ]]; then
-                echo -e "${{newline}}\t0" > {output}
+                echo -e "${{newline}}\t0" > {output.stats_file}
+                touch {output.json_file}
             else
                 samtools faidx {input.fa} ${{seq_name}} > best.fa
                 gramtools simulate --prg {input.prg} -i best.fa --sample_id {wildcards.assembly}_{wildcards.gene}_${{condition}} -o {params.odir} --force
-                echo -e "${{newline}}\t1" > {output}
+                echo -e "${{newline}}\t1" > {output.stats_file}
             fi
         done
         """
@@ -151,13 +164,46 @@ rule concat_stats:
             gene=GENES,
         ),
     output:
-        str(output_base / "stats.tsv"),
+        str(output_base / "closest_stats.tsv"),
     shell:
         """
         echo "gene\tsample\tNM\tcondition\tquery\tfound_in_prg" > {output}
         cat {input} >> {output}
         """
 
+rule tb_evaluate_jvcf:
+    input:
+        json_truth=rules.tb_gramtools_induce_in_prg.output.json_file,
+        json_gtyped=f'{gramtools_genotyped}/{{assembly}}/genotype/genotyped.json',
+    output:
+        f'{output_eval}/{{assembly}}_{{gene}}.tsv',
+    params:
+        eval_script=f'{config["scripts"]}/pacb_ilmn_prg_closest/evaluate_jvcf.py',
+        region=lambda wildcards: regions[wildcards.gene],
+    shell:
+        """
+        if [[ ! -s {input.json_truth} ]]; then touch {output}
+        else
+            python3 {params.eval_script} --region {params.region} {input.json_gtyped} {input.json_truth} {output}
+        fi
+        """
+
+rule concat_evals:
+    input:
+        expand(
+            f"{output_eval}/{{assembly}}_{{gene}}.tsv",
+            assembly=ASSEMBLIES,
+            gene=GENES,
+        ),
+    output:
+        str(output_base / "eval_stats.tsv"),
+    params:
+        eval_script=f'{config["scripts"]}/pacb_ilmn_prg_closest/evaluate_jvcf.py',
+    shell:
+        """
+        python3 {params.eval_script} -p > {output}
+        cat {input} >> {output}
+        """
 
 rule plot_delta_NM:
     input:

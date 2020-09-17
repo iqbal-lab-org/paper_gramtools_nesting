@@ -1,6 +1,6 @@
 import pytest
 
-from msps_dimorphism.site_regions import Region, is_in_region
+from jvcf_processing import Region, is_in_region
 
 
 @pytest.fixture(scope="class")

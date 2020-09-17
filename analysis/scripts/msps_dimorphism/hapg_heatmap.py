@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 
-from msps_dimorphism.site_regions import (
+from jvcf_processing import (
     Region,
     get_region,
     is_in_region,

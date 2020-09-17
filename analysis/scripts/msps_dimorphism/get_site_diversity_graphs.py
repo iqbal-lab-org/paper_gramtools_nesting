@@ -10,7 +10,7 @@ from itertools import combinations
 import click
 from igraph import Graph
 
-from msps_dimorphism.site_regions import (
+from jvcf_processing import (
     Region,
     get_region,
     is_in_region,

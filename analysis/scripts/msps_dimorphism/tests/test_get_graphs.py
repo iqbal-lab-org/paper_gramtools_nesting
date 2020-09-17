@@ -8,7 +8,7 @@ from msps_dimorphism.get_site_diversity_graphs import (
     wire,
     make_site_graph,
 )
-from msps_dimorphism.site_regions import Region
+from jvcf_processing import Region
 
 
 class TestSampleIndices:
