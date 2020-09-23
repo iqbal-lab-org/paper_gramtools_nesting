@@ -165,7 +165,7 @@ def aggregate_simu_paths(wildcards):
     return res
 
 
-rule aggregate:
+rule simu_aggregate:
     input:
         aggregate_simu_paths,
     output:
@@ -179,7 +179,7 @@ rule aggregate:
 
 rule simu_plot:
     input:
-        to_eval=rules.aggregate.output,
+        to_eval=rules.simu_aggregate.output,
     output:
         f"{output_plots}/{{dataset}}_precision_recall.pdf",
     params:

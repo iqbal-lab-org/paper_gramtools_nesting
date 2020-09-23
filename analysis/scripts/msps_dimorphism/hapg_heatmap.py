@@ -10,7 +10,7 @@ from matplotlib.colors import ListedColormap
 
 from jvcf_processing import (
     Region,
-    get_region,
+    click_get_region,
     is_in_region,
     first_idx_in_region,
 )
@@ -100,7 +100,7 @@ def get_clustermap(df: pd.DataFrame, site_is_nested: List[bool]):
     "-r",
     help="In the form 'SEG:start-end', as in samtools/bcftools",
     default=None,
-    callback=get_region,
+    callback=click_get_region,
 )
 @click.option(
     "--partition_file",

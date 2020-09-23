@@ -64,7 +64,7 @@ with open(config["beds"]["with_flank"]) as fin:
 rule all:
     input:
         str(output_base / "closest_stats.tsv"),
-        str(output_base / "eval_stats.tsv"),
+        str(output_base / f"eval_stats_{GMTOOLS_COMMIT}.tsv"),
 
 rule index_input_seqs:
     input:
@@ -196,7 +196,7 @@ rule concat_evals:
             gene=GENES,
         ),
     output:
-        str(output_base / "eval_stats.tsv"),
+        str(output_base / f"eval_stats_{GMTOOLS_COMMIT}.tsv"),
     params:
         eval_script=f'{config["scripts"]}/pacb_ilmn_prg_closest/evaluate_jvcf.py',
     shell:

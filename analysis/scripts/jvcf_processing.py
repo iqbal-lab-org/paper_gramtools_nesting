@@ -22,14 +22,9 @@ class Region(NamedTuple):
     end: int = -1
 
 
-def get_region(ctx, param, region_str: Optional[str]) -> Region:
-    """
-    callback validator to click command line parameter;
-    parses a string into a Region
-    """
+def get_region(region_str: Optional[str]) -> Region:
     if region_str is None:
         return Region()
-
     match_obj = region_matcher.fullmatch(region_str)
     if match_obj is not None:
         segment, start, end = (
@@ -39,9 +34,20 @@ def get_region(ctx, param, region_str: Optional[str]) -> Region:
         )
         if start <= end and start >= 1 and end >= 1:
             return Region(segment, start, end)
-    raise click.BadParameter(
+    raise ValueError(
         "region does not conform to requirements: 'seg:start-end', 1-based, end>=start."
     )
+
+
+def click_get_region(ctx, param, region_str: Optional[str]) -> Region:
+    """
+    callback validator to click command line parameter;
+    parses a string into a Region
+    """
+    try:
+        return get_region(region_str)
+    except ValueError as e:
+        raise click.BadParameter(e)
 
 
 def is_in_region(site_json: SiteJson, region: Region) -> bool:
@@ -74,6 +80,18 @@ def get_sites_in_region(sites_json: SiteJsons, region: Region) -> SiteJsons:
     while last_idx < max_idx and is_in_region(sites_json[last_idx], region):
         last_idx += 1
     return sites_json[first_idx:last_idx]
+
+
+def get_n_sites_starting_from_region(
+    sites_json: SiteJsons, region: Region, num_sites: int
+) -> SiteJsons:
+    first_idx = first_idx_in_region(sites_json, region)
+    total_num_sites = len(sites_json)
+    if (first_idx + num_sites) > total_num_sites:
+        raise ValueError(
+            f"Getting {num_sites} starting from {region} requires more sites than available"
+        )
+    return sites_json[first_idx : first_idx + num_sites]
 
 
 ### Extracting information ###
@@ -116,6 +134,18 @@ def get_called_allele(sample_index: int, site_json: SiteJson) -> AlleleCall:
     return AlleleCall(allele_index, allele)
 
 
+def num_sites_under(child_map: Dict, site_idx: str) -> int:
+    result = 0
+    to_visit: List[int] = [site_idx]
+    while len(to_visit) > 0:
+        child_entries = child_map.get(to_visit.pop(), dict())
+        for vals in child_entries.values():
+            result += len(vals)
+            to_visit.extend(map(str, vals))
+    return result
+
+
+### Evaluate a genotyped jvcf using a truth jvcf ###
 class FixedDict(dict):
     """Cannot add new keys"""
 
@@ -130,7 +160,6 @@ class FixedDict(dict):
         dict.__setitem__(self, key, item)
 
 
-### Evaluate a genotyped jvcf using a truth jvcf ###
 def call_classif(res_call: AlleleCall, truth_call: AlleleCall) -> str:
     if res_call.has_call():
         if not truth_call.has_call():
@@ -141,7 +170,7 @@ def call_classif(res_call: AlleleCall, truth_call: AlleleCall) -> str:
             else:
                 return "FP"
     else:
-        if res_call.has_call():
+        if truth_call.has_call():
             return "FN"
         else:
             return "TN"

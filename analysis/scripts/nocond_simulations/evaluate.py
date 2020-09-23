@@ -5,7 +5,13 @@ from typing import NamedTuple, Union
 import pandas as pd
 import click
 
-from jvcf_processing import find_sample_index, AlleleCall, get_called_allele
+from jvcf_processing import (
+    find_sample_index,
+    AlleleCall,
+    get_called_allele,
+    evaluate_site,
+    num_sites_under,
+)
 
 columns = [
     "prg",
@@ -16,17 +22,19 @@ columns = [
     "res_has_call",
     "truth_has_call",
     "res_is_correct",
+    "classif",
     "lvl_1",
     "GC",
     "GCP",
-    "edit_dist",
-    "truth_allele",
     "gt_allele",
+    "truth_allele",
+    "edit_dist",
     "cov_gt_allele",
     "cov_other_alleles",
     "site_num",
     "site_pos",
     "ambiguous",
+    "num_child_sites",
 ]
 result_template = {k: "NA" for k in columns}
 
@@ -91,6 +99,8 @@ def main(prg_name, num, err_rate, fcov, nesting, truth_json, res_json, output_pa
         next_result.update(
             {key: val for key, val in eval_results.items() if key in next_result}
         )
+
+        next_result["num_child_sites"] = num_sites_under(res_json["Child_Map"], str(i))
 
         if lvl1_sites == {"all"} or i in lvl1_sites:
             next_result["lvl_1"] = "1"
