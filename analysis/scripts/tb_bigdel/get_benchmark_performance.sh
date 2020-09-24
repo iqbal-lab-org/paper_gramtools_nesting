@@ -60,6 +60,7 @@ get_speed(){
 
 # Get mean CPU times for genotyping
 mean_CPU_gramtools=$(get_metric "CPU time" "tb_gramtools_genotype")
+mean_CPU_gramtools=$(echo "print($mean_reads / $mean_CPU_gramtools)" | python3)
 mean_CPU_vg=$(get_speed tb_vg_map tb_vg_genotype)
 mean_CPU_graphtyper=$(get_speed tb_map_reads_to_ref tb_graphtyper_genotype)
 

@@ -18,7 +18,7 @@ rule tb_gram_build:
 rule tb_gramtools_genotype:
     input:
         gram_build_completed=rules.tb_gram_build.output,
-        gram_dir=f"{Path(rules.gram_build.output[0]).parent}",
+        gram_dir=f"{Path(rules.tb_gram_build.output[0]).parent}",
         reads_files=get_reads,
     output:
         sample_geno_dir=directory(f"{output_genotyped}/{conditions[0]}/{{sample}}"),
@@ -28,6 +28,8 @@ rule tb_gramtools_genotype:
     threads: 10
     resources:
         mem_mb=10000,
+    shadow:
+        "shallow"
     shell:
         """
         gramtools genotype -i {input.gram_dir} -o {output.sample_geno_dir} --reads {input.reads_files} --sample_id {wildcards.sample} --max_threads {threads} --seed 42 --force
@@ -65,8 +67,8 @@ rule tb_vg_build:
 
 rule tb_vg_map:
     input:
-        xg=rules.vg_build.output.xg,
-        gcsa=rules.vg_build.output.gcsa,
+        xg=rules.tb_vg_build.output.xg,
+        gcsa=rules.tb_vg_build.output.gcsa,
         reads_files=get_reads,
     output:
         mapped_packed=f"{output_vg_mapped}/mapped_{{sample}}.pack",
@@ -88,9 +90,9 @@ rule tb_vg_map:
 
 rule tb_vg_genotype:
     input:
-        xg=rules.vg_build.output.xg,
+        xg=rules.tb_vg_build.output.xg,
         mapped=rules.tb_vg_map.output.mapped_packed,
-        snarls=rules.vg_build.output.snarls,
+        snarls=rules.tb_vg_build.output.snarls,
         vcf_to_genotype=config["vcf_to_genotype"],
     output:
         gzipped=f"{output_genotyped}/{conditions[1]}/{{sample}}.vcf.gz",
