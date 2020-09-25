@@ -3,6 +3,8 @@ From: ubuntu:focal
 
 %setup
     mkdir ${SINGULARITY_ROOTFS}/setup_files
+    rsync -a analysis/scripts/ ${SINGULARITY_ROOTFS}/nesting_paper_scripts
+
 %files
     container/pyrequirements.txt /setup_files
     container/Rpacks.R /setup_files
@@ -19,7 +21,7 @@ From: ubuntu:focal
 	cmake \
 	git \
 	pkg-config \
-	python3 \
+	python3.8 \
 	python3-pip \
     r-base \
 	wget \
@@ -28,6 +30,7 @@ From: ubuntu:focal
 	# python requirements of repo
 	pip3 install pip==20.0.2 
 	pip3 install -r /setup_files/pyrequirements.txt
+    pip3 install -e /nesting_paper_scripts
 
     # R requirements of repo
     Rscript /setup_files/Rpacks.R
@@ -81,10 +84,10 @@ From: ubuntu:focal
 	cd minimap2-2.17_x64-linux && cp minimap2 paftools.js k8 /usr/bin && cd .. && rm -r minimap2-2.17_x64-linux
 
 	## vg (genome graph toolkit)
-	wget -O /usr/bin/vg https://github.com/vgteam/vg/releases/download/v1.26.0/vg && chmod u+x /usr/bin/vg
+	wget -O /usr/bin/vg https://github.com/vgteam/vg/releases/download/v1.26.0/vg && chmod a+x /usr/bin/vg
 
 	## graphtyper2 (genome graph toolkit)
-	wget -O /usr/bin/graphtyper https://github.com/DecodeGenetics/graphtyper/releases/download/v2.5.1/graphtyper && chmod u+x /usr/bin/graphtyper 
+	wget -O /usr/bin/graphtyper https://github.com/DecodeGenetics/graphtyper/releases/download/v2.5.1/graphtyper && chmod a+x /usr/bin/graphtyper 
 
 	## make_prg (genome graph construction)
 	cd ${HOME}
@@ -105,7 +108,7 @@ From: ubuntu:focal
 
 	cd ${HOME}
 	git clone https://github.com/iqbal-lab-org/gramtools
-	cd gramtools && git checkout 80dfb019eb7a223ced2a2985088 && mkdir build && cd build
+	cd gramtools && git checkout e0d5b829d135ca553e820ebf2 && mkdir build && cd build
 	cmake .. -DCMAKE_BUILD_TYPE=REL_WITH_ASSERTS
 	make -j 4 gram encode_prg combine_jvcfs
 	cp ../libgramtools/submods/encode_prg.bin /usr/bin/encode_prg

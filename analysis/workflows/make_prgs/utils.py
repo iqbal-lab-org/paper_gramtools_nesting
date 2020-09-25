@@ -13,8 +13,9 @@ def load_vcf_names(fname: str, prg_name: str) -> Dict:
         for line in fin:
             fname = Path(config["vcf_prefix"]) / Path(line.strip())
             if not fname.exists():
-                print(f"Error: required file {fname} not found")
-                exit(1)
+                pass
+                # print(f"Error: required file {fname} not found")
+                # exit(1)
             if prg_name.startswith("pf"):
                 sample_name = sample_name_matcher.match(str(fname.name)).group(1)
             else:

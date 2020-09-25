@@ -2,6 +2,7 @@ library(ggplot2)
 library(tibble)
 library(tidyr)
 library(dplyr)
+library(readr)
 library(argparser, quietly=TRUE)
 
 p <- arg_parser("Plot tb_bigdel alignment stats across tools")
@@ -17,6 +18,13 @@ plot_ecdf <- function(dataset, output_dir, commit, name){
   ggsave(file.path(output_dir,fname),width = 9, height = 6, plot=ecdf_plot)
 }
 
+write_mean_eddist <- function(dataset, output_dir, commit, name){
+# Write mean edit distance of aligned sequences by condition
+  mean_eddist <- dataset %>% group_by(condition) %>% summarise(dist=mean(NM,na.rm=TRUE))
+  fname <- sprintf("mean_eddist_%s_%s.txt", commit, name)
+  write_tsv(mean_eddist, file.path(output_dir, fname))
+}
+
 plot_upset <- function(dataset, output_dir, commit, name){
   # Convert to long format: matrix of 1s and 0s saying whether each seq was found
   df_long_numeric <- dataset %>%
@@ -30,6 +38,15 @@ plot_upset <- function(dataset, output_dir, commit, name){
   print(plot)
   dev.off()
 }
+
+write_num_aligned <- function(dataset, output_dir, commit, name){
+# Write number of aligned sequences by condition
+  num_aligned <- dataset %>% filter(!is.na(NM)) %>% 
+    group_by(condition) %>% summarise(n())
+  fname <- sprintf("num_aligned_%s_%s.txt", commit, name)
+  write_tsv(num_aligned, file.path(output_dir, fname))
+}
+
 
 argv <- parse_args(p)
 gram_commit = argv$gramtools_commit
@@ -55,6 +72,9 @@ plot_ecdf(df_unfiltered, outdir, gram_commit, "unfiltered")
 plot_ecdf(df_mapq, outdir, gram_commit, "filtered_mapq40")
 plot_ecdf(df_mask, outdir, gram_commit, "filtered_mask10percent")
 
+write_mean_eddist(df_unfiltered, outdir, gram_commit, "unfiltered")
+write_mean_eddist(df_mapq, outdir, gram_commit, "filtered_mapq40")
+
 
 ## Plot set intersections: upset plot ##
 
@@ -69,6 +89,8 @@ plot_upset(df_unfiltered, outdir, gram_commit, "unfiltered")
 plot_upset(df_mapq, outdir, gram_commit, "filtered_mapq40")
 plot_upset(df_mask, outdir, gram_commit, "filtered_mask10percent")
 
+write_num_aligned(df_unfiltered, outdir, gram_commit, "unfiltered")
+write_num_aligned(df_mapq, outdir, gram_commit, "filtered_mapq40")
 
 ## Using ggupset package, interfaces with ggplot
 #library(ggupset)
@@ -83,7 +105,3 @@ plot_upset(df_mask, outdir, gram_commit, "filtered_mask10percent")
 ### Utilities ###
 # Show sequences missed by gramtools but found by others
 #df_long %>% filter(baseline_ref == TRUE & gramtools == FALSE & vg == TRUE)
-
-# Get mean edit distance by condition
-#df %>% group_by(condition) %>% summarise(dist=mean(NM,na.rm=TRUE))
-

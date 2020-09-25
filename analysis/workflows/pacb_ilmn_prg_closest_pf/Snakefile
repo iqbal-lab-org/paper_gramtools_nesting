@@ -24,7 +24,9 @@ ASSEMBLIES = get_samples(config["sample_tsv"], excluded)
 
 # Get input prg vcfs to process
 include: "../make_prgs/utils.py"
+include: "../common_utils.py"
 
+GMTOOLS_COMMIT = get_gmtools_commit()
 
 vcfs = load_vcf_names(config["vcf_list"], "pf_4surfants")
 
@@ -34,29 +36,44 @@ with open(config["genes"]) as f:
 
 
 # ____Output paths___#
-include: "../common_utils.py"
-
-
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
-output_portions = output_base / "gene_portions"
-output_seqs = output_base / "gene_sequences"
 output_alignments = output_base / "alignments"
-output_plots = output_base / "plots"
+output_portions = output_alignments / "gene_portions"
+output_seqs = output_alignments / "gene_sequences"
+output_plots = output_base / "plots" / GMTOOLS_COMMIT
+output_prelim_stats = output_base / "prelim_stats"
+output_indexes = output_base / "indexes"
+output_fastas = output_indexes / "fasta"
+output_prgs = output_indexes / "prgs"
+output_induced = output_base / "induced"
+output_eval = output_base / "eval_jvcf" / f"gramtools_{GMTOOLS_COMMIT}"
 mk_output_dirs(dir())
 
 # __Input paths__#
 output_bowtie_indexes = Path(
     f'{config["output_dir"]}/pacb_ilmn_validation/bowtie_indexes'
 )
-GMTOOLS_COMMIT = get_gmtools_commit()
+input_sequences_dir = Path(f'{config["output_dir"]}/make_prgs/pf_4surfants/msas')
 validation_stats = Path(
-    f'{config["output_dir"]}/pacb_ilmn_validation/pf_4surfants/{GMTOOLS_COMMIT}/plots/stats.tsv'
+    f'{config["output_dir"]}/pacb_ilmn_validation/pf_4surfants/plots/{GMTOOLS_COMMIT}/stats.tsv'
 )
+input_prgs_dir = Path(f'{config["output_dir"]}/make_prgs/pf_4surfants/prgs/mn5_mml7')
+gramtools_genotyped = Path(f'{config["output_dir"]}/pacb_ilmn_validation/pf_4surfants/gramtools_{GMTOOLS_COMMIT}')
+
+
+# __Genomic regions__'
+regions = dict()
+with open(config["beds"]["with_flank"]) as fin:
+   for line in fin:
+        elems = line.strip().split("\t") 
+        regions[elems[3]] = f'{elems[0]}:{int(elems[1])+1}-{elems[2]}'
 
 
 rule all:
     input:
         expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
+        str(output_base / "closest_stats.tsv"),
+        str(output_base / f"eval_stats_{GMTOOLS_COMMIT}.tsv"),
 
 
 rule make_var_sample_portions:
@@ -108,6 +125,32 @@ rule cat_var_portions:
                     sequence = fin.read()
                 fout.write(sequence)
 
+rule index_input_seqs:
+    input:
+        gene_portions=f"{input_sequences_dir}/{{gene}}.fa",
+    output:
+        fa=f"{output_fastas}/{{gene}}.fa",
+        fai=f"{output_fastas}/{{gene}}.fa.fai",
+    shell:
+        """
+        cp {input} {output.fa}
+        samtools faidx {output.fa}
+        """
+
+rule index_input_prg:
+    input:
+        prg=f"{input_prgs_dir}/{{gene}}.bin",
+    output:
+        prg=f"{output_prgs}/{{gene}}",
+    params:
+        concat_prg_script=f'{config["scripts"]}/make_prgs/concat_prgs.py',
+    shadow:
+        "shallow"
+    shell:
+        f"""
+        echo -e "\t\t\t{{wildcards.gene}}" > to_concat.txt
+        python3 {{params.concat_prg_script}} {input_prgs_dir} to_concat.txt {{output.prg}}
+        """
 
 rule align_to_assemblies:
     input:
@@ -132,21 +175,42 @@ rule get_stats:
         alignment_file=f"{output_alignments}/{{assembly}}_{{gene}}.sam",
         var_bed=config["initial_bed"],
     output:
-        stats_file=f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
+        stats_file=f"{output_prelim_stats}/{{assembly}}_{{gene}}.tsv",
+    params:
+        script=f'{config["scripts"]}/pacb_ilmn_prg_closest/process_alignments.py',
     shell:
         """
-        gene_line=$(grep -w {wildcards.gene} {input.var_bed})
-        IFS="\t"; elems=($gene_line)    
-        gene_len=$((${{elems[2]}} - ${{elems[1]}} + 1))
-        # Hack: these pipes sometimes have non-zero exit code, echo solves it
-        all_NM=$(grep -Eo 'NM:i:[0-9]+' {input.alignment_file} | cut -f 3 -d ':' | sort -n)
-        echo ""
-        best_match=$(echo $all_NM | head -n 1)
-        echo ""
-        best_match_frac=$(echo $best_match / $gene_len | bc -l)
-        echo -e "{wildcards.gene}\t{wildcards.assembly}\t${{best_match_frac}}\tclosest_in_prg"  > {output.stats_file}
+        python3 {params.script} --min_qlen 500 {input.alignment_file} {input.var_bed} {output}
         """
 
+rule pf_gramtools_induce_in_prg:
+    input:
+        stats_file=f"{output_prelim_stats}/{{assembly}}_{{gene}}.tsv",
+        fa=f"{output_fastas}/{{gene}}.fa",
+        prg=f"{output_prgs}/{{gene}}",
+    output:
+        stats_file=f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
+        json_file=f"{output_induced}/{{assembly}}_{{gene}}_closest_in_prg_mapq_40.json",
+    params:
+        odir=output_induced,
+    shadow:
+        "shallow"
+    shell:
+        """
+        IFS="\n"; for line in $(cat {input.stats_file})
+        do
+            IFS="\t"; elems=($line); seq_name=${{elems[4]}}; condition=${{elems[3]}}
+            newline=$(echo ${{elems[@]}} | tr ' ' '\t' | tr -d '\n')
+            if [[ $seq_name == "NA" ]]; then
+                echo -e "${{newline}}\t0" > {output.stats_file}
+                touch {output.json_file}
+            else
+                samtools faidx {input.fa} ${{seq_name}} > best.fa
+                gramtools simulate --prg {input.prg} -i best.fa --sample_id {wildcards.assembly}_{wildcards.gene}_${{condition}} -o {params.odir} --force
+                echo -e "${{newline}}\t1" > {output.stats_file}
+            fi
+        done
+        """
 
 rule concat_stats:
     input:
@@ -156,10 +220,44 @@ rule concat_stats:
             gene=GENES,
         ),
     output:
-        str(output_base / "stats.tsv"),
+        str(output_base / "closest_stats.tsv"),
     shell:
         """
-        echo "gene\tsample\tNM\tcondition\n" > {output}
+        echo "gene\tsample\tNM\tcondition\tquery\tfound_in_prg" > {output}
+        cat {input} >> {output}
+        """
+
+rule pf_evaluate_jvcf:
+    input:
+        json_truth=rules.pf_gramtools_induce_in_prg.output.json_file,
+        json_gtyped=f'{gramtools_genotyped}/{{assembly}}/genotype/genotyped.json',
+    output:
+        f'{output_eval}/{{assembly}}_{{gene}}.tsv',
+    params:
+        eval_script=f'{config["scripts"]}/pacb_ilmn_prg_closest/evaluate_jvcf.py',
+        region=lambda wildcards: regions[wildcards.gene],
+    shell:
+        """
+        if [[ ! -s {input.json_truth} ]]; then touch {output}
+        else
+            python3 {params.eval_script} --region {params.region} {input.json_gtyped} {input.json_truth} {output}
+        fi
+        """
+
+rule concat_evals:
+    input:
+        expand(
+            f"{output_eval}/{{assembly}}_{{gene}}.tsv",
+            assembly=ASSEMBLIES,
+            gene=GENES,
+        ),
+    output:
+        str(output_base / f"eval_stats_{GMTOOLS_COMMIT}.tsv"),
+    params:
+        eval_script=f'{config["scripts"]}/pacb_ilmn_prg_closest/evaluate_jvcf.py',
+    shell:
+        """
+        python3 {params.eval_script} -p > {output}
         cat {input} >> {output}
         """
 
@@ -171,6 +269,6 @@ rule plot_delta_NM:
     output:
         expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
     params:
-        script=f'{config["scripts"]}/{WORKFLOW}/process_stats.py',
+        script=f'{config["scripts"]}/pacb_ilmn_prg_closest/process_stats.py',
     shell:
         f"python3 {{params.script}} {{input.validation_stats}} {{input.closest_prg_stats}} {output_plots}"

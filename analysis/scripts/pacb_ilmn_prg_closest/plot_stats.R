@@ -10,7 +10,7 @@ df_unfiltered$condition = replace(as.vector(df_unfiltered$condition), df_unfilte
 conditions = as.character(unique(df_unfiltered$condition))
 
 
-prg_closest <- as_tibble(read.csv("/tmp/prg_stats.tsv", sep="\t"))
+prg_closest <- as_tibble(read.csv("/tmp/closest_stats.tsv", sep="\t"))
 df_mapq <- df_unfiltered %>% filter(is.na(MAPQ) | MAPQ > 40)
 merged <- bind_rows(df_mapq, prg_closest)
 merged_long <- merged %>%
@@ -21,6 +21,7 @@ merged_long <- merged_long %>% mutate(gramtools_diff=gramtools - closest_in_prg_
 
 # In these 32 cases, gramtools precision is 2x worse than vg and 5x worse than gtyper2,
 # and the closest input has 97% lower distance than found by gramtools
+all_bad_gtypes <- merged_long %>% filter(gramtools_diff > 0)
 bad_gtypes <- merged_long %>% filter(gramtools_diff > 0.005)
 bad_gtypes %>% summarise_all(mean,na.rm=TRUE)
 

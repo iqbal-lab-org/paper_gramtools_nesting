@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from pysam import AlignmentFile
 
 
 def usage():
@@ -22,13 +21,17 @@ if __name__ == "__main__":
     v_stats = pd.read_csv(sys.argv[1], sep="\t")
     c_stats = pd.read_csv(sys.argv[2], sep="\t")
 
+    v_stats = v_stats.replace(r"gramtools_.+", "gramtools", regex=True)
+
     sns.set(font_scale=1.3)
     combined = pd.concat([v_stats, c_stats])
 
     diff_df_rows = []
     for _, group_df in combined.groupby(["gene", "sample"]):
-        next_best = group_df[group_df["condition"] == "closest_in_prg"]["NM"].iloc[0]
-        gtype_NM = group_df[group_df["condition"] == "gramtools_genotype"]["NM"].iloc[0]
+        next_best = group_df[group_df["condition"] == "closest_in_prg_mapq_40"][
+            "NM"
+        ].iloc[0]
+        gtype_NM = group_df[group_df["condition"] == "gramtools"]["NM"].iloc[0]
         new_row = {
             "gene": group_df["gene"].iloc[0],
             "sample": group_df["sample"].iloc[0],
@@ -49,3 +52,4 @@ if __name__ == "__main__":
         ax = sns.swarmplot(data=filtered, y="delta_NM", color=".2")
         ax.figure.savefig(str(output_dir / f"{gene}_gmtools_delta.pdf"))
         ax = None
+    diff_df.to_csv(str(output_dir / "diff_NM"), sep="\t")
