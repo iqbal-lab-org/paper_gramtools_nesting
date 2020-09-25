@@ -87,6 +87,11 @@ Requires: make_prgs on mtuberculosis.yaml ; vg_make_prgs
 
 This produces the benchmark results of the paper: analysis of large deletions and small variants under them in M. tuberculosis with comparison to vg and graphtyper2.
 
+pacb_ilmn_prg_closest_pf
+`````````````````````````
+Requires: pacb_ilmn_validation
+
+This produces the other part of genotyping in DBLMSP2 results of the paper: performance of gramtools compared to the closest input sequence in the graph.
 
 Development
 ============

@@ -13,9 +13,10 @@ WORKFLOW = "pacb_ilmn_validation"
 
 configfile: "analysis/configs/common.yaml"
 configfile: f"analysis/configs/{WORKFLOW}/pfalciparum.yaml"
+configfile: f"analysis/configs/make_prgs/pfalciparum.yaml"
 
 
-# container: config["container"]
+container: config["container"]
 
 
 include: "utils.py"
@@ -24,7 +25,7 @@ include: "../common_utils.py"
 
 GMTOOLS_COMMIT = get_gmtools_commit()
 
-gene_list = Path(config["starting_prg"]["gene_list"])
+gene_list = Path(config["genes"])
 with gene_list.open() as fin:
     GENES = fin.read().splitlines()
 gene_list = gene_list.stem
@@ -32,14 +33,14 @@ gene_list = gene_list.stem
 # _____Set up output paths______#
 output_gram_build = Path(f'{config["gram_builds_dir"]}/{gene_list}/{GMTOOLS_COMMIT}')
 output_base = f'{config["output_dir"]}/{WORKFLOW}/'
-output_gene_list = Path(f"{output_base}/{gene_list}/{GMTOOLS_COMMIT}")
+output_gene_list = Path(f"{output_base}/{gene_list}/")
 
 # Bit of trickery with dirs: in rule align_induced_gene_seqs, require rules to produce outputs without '/' in wildcard name,
 # so refer to this array's elements directly
 vcf_outputs_dirs = [
     "cortex_baseline_ref",
     "samtools_baseline_ref",
-    "gramtools_genotype",
+    f"gramtools_{GMTOOLS_COMMIT}",
     "cortex_pers_ref",
     "samtools_pers_ref",
 ]
@@ -50,11 +51,11 @@ output_cortex_pers_ref = output_gene_list / vcf_outputs_dirs[3]
 output_samtools_pers_ref = output_gene_list / vcf_outputs_dirs[4]
 
 output_alignments = (
-    output_gene_list / f'alignments_{Path(config["starting_prg"]["var_regions"]).stem}'
+    output_gene_list / f'alignments_{Path(config["initial_bed"]).stem}'
 )
 output_gene_portions = output_alignments / "gene_portions"
 output_bowtie_indexes = Path(f"{output_base}/bowtie_indexes")
-output_plots = Path(f"{output_gene_list}/plots")
+output_plots = Path(f"{output_gene_list}/plots/{GMTOOLS_COMMIT}")
 
 mk_output_dirs(dir())
 
@@ -70,7 +71,7 @@ rule all:
         expand(f"{output_plots}/NM_{{gene}}.pdf", gene=GENES),
 
 
-rule index_pacb_assemblies:
+rule validation_index_pacb_assemblies:
     input:
         assembly=get_assembly,
     output:
@@ -85,10 +86,10 @@ rule index_pacb_assemblies:
         "bowtie2-build {input.assembly[0]} {params.directory}"
 
 
-rule gram_build:
+rule validation_gram_build:
     input:
-        prg=config["starting_prg"]["prg"],
-        ref=config["starting_prg"]["fasta_ref"],
+        prg=config["starting_prg"],
+        ref=config["genome_fasta"],
     output:
         f"{output_gram_build}/cov_graph",
     params:
@@ -104,7 +105,7 @@ rule gram_build:
 
 rule cortex_baseline_ref:
     input:
-        fasta_ref=config["starting_prg"]["fasta_ref"],
+        fasta_ref=config["genome_fasta"],
         reads_files=get_reads,
     output:
         out_vcf=f"{output_gene_list}/{vcf_outputs_dirs[0]}/{{sample}}.vcf.gz",
@@ -124,7 +125,7 @@ rule cortex_baseline_ref:
 
 rule samtools_baseline_ref:
     input:
-        fasta_ref=config["starting_prg"]["fasta_ref"],
+        fasta_ref=config["genome_fasta"],
         reads_files=get_reads,
     output:
         out_vcf=f"{output_gene_list}/{vcf_outputs_dirs[1]}/{{sample}}.vcf.gz",
@@ -140,10 +141,10 @@ rule samtools_baseline_ref:
         "bash {params.samtools_script} {input.fasta_ref} '{input.reads_files}' {output.out_vcf} {threads}"
 
 
-rule pacb_ilmn_validation_gramtools_genotype:
+rule validation_gramtools_genotype:
     input:
-        gram_build_completed=rules.gram_build.output,
-        gram_dir=f"{Path(rules.gram_build.output[0]).parent}",
+        gram_build_completed=rules.validation_gram_build.output,
+        gram_dir=f"{Path(rules.validation_gram_build.output[0]).parent}",
         reads_files=get_reads,
     output:
         sample_geno_dir=directory(f"{output_gramtools_genotype}/{{sample}}"),
@@ -167,7 +168,7 @@ rule pacb_ilmn_validation_gramtools_genotype:
 rule cortex_pers_ref:
     input:
         sample_geno_dir=f"{output_gramtools_genotype}/{{sample}}",
-        geno_vcf=rules.pacb_ilmn_validation_gramtools_genotype.output.out_vcf,
+        geno_vcf=rules.validation_gramtools_genotype.output.out_vcf,
     output:
         out_vcf=f"{output_gene_list}/{vcf_outputs_dirs[3]}/{{sample}}.vcf.gz",
         sample_discov_dir=directory(f"{output_cortex_pers_ref}/{{sample}}"),
@@ -188,7 +189,7 @@ rule cortex_pers_ref:
 rule samtools_pers_ref:
     input:
         reads_files=get_reads,
-        pers_ref=rules.pacb_ilmn_validation_gramtools_genotype.output.pers_ref,
+        pers_ref=rules.validation_gramtools_genotype.output.pers_ref,
     output:
         out_vcf=f"{output_gene_list}/{vcf_outputs_dirs[4]}/{{sample}}.vcf.gz",
         bcftools_index=f"{output_samtools_pers_ref}/{{sample}}.vcf.gz.csi",
@@ -203,7 +204,7 @@ rule samtools_pers_ref:
         "bash {params.samtools_script} {input.pers_ref} '{input.reads_files}' {output.out_vcf} {threads}"
 
 
-rule align_induced_gene_seqs:
+rule validation_align_induced_gene_seqs:
     input:
         truth_ref_idx=expand(
             f"{output_bowtie_indexes}/{{sample}}.{{ext}}",
@@ -211,8 +212,8 @@ rule align_induced_gene_seqs:
             allow_missing=True,
         ),
         result_vcf=f"{output_gene_list}/{{condition}}/{{sample}}.vcf.gz",
-        var_regions=config["starting_prg"]["var_regions"],
-        fasta_ref=config["starting_prg"]["fasta_ref"],
+        var_regions=config["initial_bed"],
+        fasta_ref=config["genome_fasta"],
     output:
         alignment_file=f"{output_alignments}/{{condition}}_{{sample}}.sam",
     params:
@@ -260,15 +261,15 @@ rule align_induced_gene_seqs:
         """
 
 
-rule align_baseline_ref_seq:
+rule validation_align_baseline_ref_seq:
     input:
         truth_ref_idx=expand(
             f"{output_bowtie_indexes}/{{sample}}.{{ext}}",
             ext=bowtie2_idx_extensions,
             allow_missing=True,
         ),
-        var_regions=config["starting_prg"]["var_regions"],
-        fasta_ref=config["starting_prg"]["fasta_ref"],
+        var_regions=config["initial_bed"],
+        fasta_ref=config["genome_fasta"],
     output:
         alignment_file=f"{output_alignments}/baseline_ref_{{sample}}.sam",
     params:
@@ -293,19 +294,19 @@ rule align_baseline_ref_seq:
         """
 
 
-rule process_and_plot_alignments:
+rule validation_process_and_plot_alignments:
     input:
         alignments=expand(
             f"{output_alignments}/{{condition}}_{{sample}}.sam",
             condition=vcf_outputs_dirs + ["baseline_ref"],
             sample=SAMPLES,
         ),
-        var_regions=config["starting_prg"]["var_regions"],
+        var_regions=config["initial_bed"],
     output:
-        f"{output_plots}/stats.tsv",
-        expand(f"{output_plots}/NM_{{gene}}.pdf", gene=GENES),
+        stats=f"{output_plots}/stats.tsv",
+        plots=expand(f"{output_plots}/NM_{{gene}}.pdf", gene=GENES),
     params:
         script_dir=f'{config["scripts"]}/{WORKFLOW}',
     shell:
-        f"python3 {{params.script_dir}}/process_alignments.py {output_alignments} {{input.var_regions}} {output_plots};"
-        f"python3 {{params.script_dir}}/plot_alignments.py {output_plots}/stats.tsv {output_plots};"
+        f"python3 {{params.script_dir}}/process_alignments.py {output_alignments} {{input.var_regions}} {{output.stats}};"
+        f"python3 {{params.script_dir}}/plot_alignments.py {{output.stats}} {output_plots};"
