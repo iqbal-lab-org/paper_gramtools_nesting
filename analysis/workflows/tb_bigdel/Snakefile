@@ -36,10 +36,10 @@ output_regions = output_base / "input_regions"
 output_minimap2 = output_regions / "minimap2"
 output_genotyped = output_base / "genotyped"
 output_prg_desc = output_base / "prg_descriptions"
-output_alignments = output_base / "alignments"
-output_ref_index = output_alignments / "ref_index"
-output_ref_alignments = output_alignments / "ilmn_alignments_ref"
-output_plots = output_base / "plots"
+output_alignments = output_base / "alignments" / GMTOOLS_COMMIT
+output_ref_index = output_base / "alignments" / "ref_index"
+output_ref_alignments = output_base / "alignments" / "ilmn_alignments_ref"
+output_plots = output_base / f"plots/{GMTOOLS_COMMIT}"
 
 # sed 's/<DEL:.*>/<DEL>/ '
 conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "graphtyper2", "baseline_ref"]
@@ -177,7 +177,7 @@ rule tb_align_induced_gene_seqs:
         idx_prefix=f"{output_bowtie_indexes}/{{sample}}",
         applied_filter=lambda wildcards: filters[wildcards.calls],
     resources:
-        mem_mb=2000,
+        mem_mb=4000,
     shadow:
         "shallow"
     shell:
