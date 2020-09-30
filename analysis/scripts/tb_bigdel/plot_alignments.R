@@ -10,8 +10,17 @@ p <- add_argument(p, "input_tsv", help="")
 p <- add_argument(p, "output_dir", help="")
 p <- add_argument(p, "gramtools_commit", help="")
 
-plot_ecdf <- function(dataset, output_dir, commit, name){
-  ecdf_plot <- ggplot(dataset, aes(x = NM, colour = condition)) + stat_ecdf(geom="step") + 
+plot_ecdf <- function(dataset, output_dir, commit, name, with_unmapped = FALSE){
+  if (with_unmapped) {
+    max_NM <- max(dataset$NM, na.rm = TRUE)
+    plotted_dataset <- dataset %>% replace_na(list(NM = max_NM))
+  }
+  else {
+    plotted_dataset = dataset
+  }
+  
+  ecdf_plot <- ggplot(plotted_dataset, aes(x = NM, colour = condition)) + stat_ecdf(geom="step", 
+                                                                                    pad = FALSE) + 
     ylab("fraction of sequences") + xlab("edit distance") + 
     theme(text=element_text(size = 13))
   fname <- sprintf("ecdf_plot_%s_%s.pdf", commit, name)
@@ -25,16 +34,24 @@ write_mean_eddist <- function(dataset, output_dir, commit, name){
   write_tsv(mean_eddist, file.path(output_dir, fname))
 }
 
-plot_upset <- function(dataset, output_dir, commit, name){
-  # Convert to long format: matrix of 1s and 0s saying whether each seq was found
-  df_long_numeric <- dataset %>%
+plot_upset <- function(dataset, output_dir, commit, name, plot_missing = FALSE){
+  # Convert to long format: matrix of 1s and 0s saying whether each seq was aligned
+  if (plot_missing){
+    plotted_dataset <- dataset %>%
+      mutate(missing = as.numeric(is.na(NM))) %>%
+      select(sample, gene, condition, missing) %>%
+      spread(condition, missing)
+  }
+  else{
+  plotted_dataset <- dataset %>%
     mutate(found = as.numeric(!is.na(NM))) %>%
     select(sample, gene, condition, found) %>%
-    spread(condition, found) %>%
-    replace(is.na(.), 0)
+    spread(condition, found)
+  }
+  
   fname <- sprintf("upset_plot_%s_%s.pdf", commit, name)
   pdf(file=file.path(output_dir,fname),width = 9, height = 6, onefile=FALSE)
-  plot<-upset(as.data.frame(df_long_numeric), sets=,order.by="freq", text.scale=1.4)
+  plot<-upset(as.data.frame(plotted_dataset), sets=,order.by="freq", text.scale=1.4)
   print(plot)
   dev.off()
 }
@@ -62,15 +79,18 @@ gram_cond = conditions[grep("gramtools_*", conditions)]
 df_unfiltered$condition = replace(as.vector(df_unfiltered$condition), df_unfiltered$condition == gram_cond, "gramtools")
 conditions = as.character(unique(df_unfiltered$condition))
 
-# Filter out alignments with worse MAPQ than baseline_ref seqs and using masks of places where ilmn
-# reads map poorly to truth assemblies
-df_mapq <- df_unfiltered %>% filter(is.na(MAPQ) | MAPQ > 40)
+# Convert alignment NM below MAPQ threshold to NA
+df_mapq <- df_unfiltered
+df_mapq$NM[df_mapq$MAPQ <= 40] <- NA
+# Require low mask overlap
 df_mask <- df_unfiltered %>% filter(mask_overlap <= 0.10)
 
 ## Plot empirical cumulative distribution functions ##
 plot_ecdf(df_unfiltered, outdir, gram_commit, "unfiltered")
+plot_ecdf(df_unfiltered, outdir, gram_commit, "unfiltered_withunmapped", with_unmapped = TRUE)
 plot_ecdf(df_mapq, outdir, gram_commit, "filtered_mapq40")
-plot_ecdf(df_mask, outdir, gram_commit, "filtered_mask10percent")
+plot_ecdf(df_mapq, outdir, gram_commit, "filtered_mapq40_withunmapped", with_unmapped = TRUE)
+#plot_ecdf(df_mask, outdir, gram_commit, "filtered_mask10percent")
 
 write_mean_eddist(df_unfiltered, outdir, gram_commit, "unfiltered")
 write_mean_eddist(df_mapq, outdir, gram_commit, "filtered_mapq40")
@@ -86,7 +106,9 @@ library(UpSetR)
 #    - Keeps mapped sequences only if delta_MAPQ is not negative: removes worse alignments
 
 plot_upset(df_unfiltered, outdir, gram_commit, "unfiltered")
+plot_upset(df_unfiltered, outdir, gram_commit, "unfiltered_unmapped", plot_missing = TRUE)
 plot_upset(df_mapq, outdir, gram_commit, "filtered_mapq40")
+plot_upset(df_mapq, outdir, gram_commit, "filtered_mapq40_unmapped", plot_missing = TRUE)
 plot_upset(df_mask, outdir, gram_commit, "filtered_mask10percent")
 
 write_num_aligned(df_unfiltered, outdir, gram_commit, "unfiltered")

@@ -71,7 +71,7 @@ with open(config["beds"]["with_flank"]) as fin:
 
 rule all:
     input:
-        expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
+        expand(f"{output_plots}/{{gene}}_gmtools_delta_mapq_40.pdf", gene=GENES),
         str(output_base / "closest_stats.tsv"),
         str(output_base / f"eval_stats_{GMTOOLS_COMMIT}.tsv"),
 
@@ -197,17 +197,18 @@ rule pf_gramtools_induce_in_prg:
         "shallow"
     shell:
         """
+        > {output.stats_file}
         IFS="\n"; for line in $(cat {input.stats_file})
         do
             IFS="\t"; elems=($line); seq_name=${{elems[4]}}; condition=${{elems[3]}}
             newline=$(echo ${{elems[@]}} | tr ' ' '\t' | tr -d '\n')
             if [[ $seq_name == "NA" ]]; then
-                echo -e "${{newline}}\t0" > {output.stats_file}
+                echo -e "${{newline}}\t0" >> {output.stats_file}
                 touch {output.json_file}
             else
                 samtools faidx {input.fa} ${{seq_name}} > best.fa
                 gramtools simulate --prg {input.prg} -i best.fa --sample_id {wildcards.assembly}_{wildcards.gene}_${{condition}} -o {params.odir} --force
-                echo -e "${{newline}}\t1" > {output.stats_file}
+                echo -e "${{newline}}\t1" >> {output.stats_file}
             fi
         done
         """
@@ -267,8 +268,8 @@ rule plot_delta_NM:
         closest_prg_stats=rules.concat_stats.output,
         validation_stats=validation_stats,
     output:
-        expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
+        expand(f"{output_plots}/{{gene}}_gmtools_delta_mapq_40.pdf", gene=GENES),
     params:
         script=f'{config["scripts"]}/pacb_ilmn_prg_closest/process_stats.py',
     shell:
-        f"python3 {{params.script}} {{input.validation_stats}} {{input.closest_prg_stats}} {output_plots}"
+        f"python3 {{params.script}} {{input.validation_stats}} {{input.closest_prg_stats}} {output_plots} {GMTOOLS_COMMIT}"

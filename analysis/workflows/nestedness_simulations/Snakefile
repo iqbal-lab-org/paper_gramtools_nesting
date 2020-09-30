@@ -19,15 +19,14 @@ GMTOOLS_COMMIT = get_gmtools_commit()
 output_base = Path(f"analysis/outputs/nestedness_simulations")
 output_paths = output_base / "paths"
 output_reads = output_base / "reads"
+output_build = output_base / "gram_build"
 
 output_base_commit = output_base / GMTOOLS_COMMIT
-output_build = output_base_commit / "gram_build"
 output_gtyping = output_base_commit / "genotyping"
 output_eval = output_base_commit / "evaluation"
 output_plots = output_base_commit / "plots"
 
-for variable in filter(lambda name: name.startswith("output"), dir()):
-    Path(eval(variable)).mkdir(exist_ok=True, parents=True)
+mk_output_dirs(dir())
 
 
 rule all:

@@ -24,11 +24,24 @@ def get_NMs(condition):
     return stats_data.loc[idx1]["NM"] - stats_data.loc[idx2]["NM"]
 
 
+def convert_names(df: pd.DataFrame) -> pd.DataFrame:
+    conversion_table = {
+        "baseline_ref": "3D7",
+        "cortex_baseline_ref": "cortex(3D7)",
+        "samtools_baseline_ref": "samtools(3D7)",
+        "cortex_pers_ref": "cortex(PR)",
+        "samtools_pers_ref": "samtools(PR)",
+    }
+    for match, replacement in conversion_table.items():
+        df = df.replace(match, replacement)
+    return df
+
+
 def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path):
     mean_metric = stats_data.groupby(["condition"])[metric].mean()
     condition_order = list(mean_metric.sort_values(ascending=False).index)
     for gene in set(stats_data["gene"]):
-        plt.figure(figsize=(13, 9.5))
+        plt.figure(figsize=(13.5, 10))
         filtered = stats_data[stats_data["gene"] == gene]
         ax = sns.boxplot(
             data=filtered,
@@ -41,7 +54,9 @@ def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path)
         ax = sns.swarmplot(
             data=filtered, x="condition", y=metric, color=".2", order=condition_order
         )
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=20)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=15)
+        if metric == "NM":
+            ax.set(ylabel="edit distance")
         ax.figure.savefig(str(output_dir / f"{metric}_{gene}.pdf"))
         ax = None
     # If want to plot both box and swarmplot in facetgrid, use below, but this makes the data points and axes too small
@@ -62,6 +77,7 @@ def main(stats_file, output_dir):
     output_dir.mkdir(exist_ok=True)
 
     stats_data = pd.read_table(str(stats_file), sep="\t")
+    stats_data = convert_names(stats_data)
 
     # gene by condition plots for each metric
     for metric in ["NM", "delta_NM", "AS", "delta_AS"]:

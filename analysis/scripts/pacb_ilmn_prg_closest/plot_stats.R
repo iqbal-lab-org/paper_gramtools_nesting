@@ -1,8 +1,11 @@
 library(ggplot2)
 library(tibble)
+library(tidyr)
 library(dplyr)
 
 df_unfiltered <- as_tibble(read.csv("/tmp/callsunfiltered_stats.tsv", sep="\t"))
+#df_unfiltered <- as_tibble(read.csv("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/tb_bigdel/plots/7d39627d/callsunfiltered_stats.tsv", sep="\t"))
+
 # Remove commit from gramtools condition name
 conditions = as.character(unique(df_unfiltered$condition))
 gram_cond = conditions[grep("gramtools_*", conditions)]
@@ -11,7 +14,9 @@ conditions = as.character(unique(df_unfiltered$condition))
 
 
 prg_closest <- as_tibble(read.csv("/tmp/closest_stats.tsv", sep="\t"))
-df_mapq <- df_unfiltered %>% filter(is.na(MAPQ) | MAPQ > 40)
+#prg_closest <- as_tibble(read.csv("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/pacb_ilmn_prg_closest_tb/closest_stats.tsv", sep="\t"))
+df_mapq <- df_unfiltered
+df_mapq$NM[df_mapq$MAPQ <= 40] <- NA
 merged <- bind_rows(df_mapq, prg_closest)
 merged_long <- merged %>%
   select(sample, gene, condition, NM) %>%
