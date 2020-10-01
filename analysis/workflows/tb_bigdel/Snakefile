@@ -41,7 +41,6 @@ output_ref_index = output_base / "alignments" / "ref_index"
 output_ref_alignments = output_base / "alignments" / "ilmn_alignments_ref"
 output_plots = output_base / f"plots/{GMTOOLS_COMMIT}"
 
-# sed 's/<DEL:.*>/<DEL>/ '
 conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "graphtyper2", "baseline_ref"]
 output_gmtools = output_genotyped / conditions[0]
 output_vg_mapped = output_genotyped / conditions[1] / "mapped_reads"
@@ -54,6 +53,8 @@ mk_output_dirs(dir())
 SAMPLES = get_samples(config["sample_tsv"])
 ref_name = Path(config["starting_prg"]["fasta_ref"]).stem
 
+with open(config["beds"]["with_flank"]) as fin:
+    num_regions=len(fin.readlines())
 
 localrules:
     all,
@@ -84,7 +85,8 @@ rule all:
             f"{output_prg_desc}/{{condition}}_variants.tsv", condition=conditions[0:2]
         ),
         plots=expand(
-            f"{output_plots}/{{calls}}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
+            f"{output_plots}/{{mapper}}/{{calls}}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
+            mapper=["bowtie2","minimap2"],
             calls=filters.keys(),
         ),
 
@@ -158,32 +160,24 @@ rule describe_jvcf_prg:
         "python3 {params.script} {input.gram_jvcf} {input.input_regions} {output.desc}"
 
 
-rule tb_align_induced_gene_seqs:
+rule tb_produce_gene_portions:
     input:
-        truth_ref_idx=expand(
-            f"{output_bowtie_indexes}/{{sample}}.{{ext}}",
-            ext=bowtie2_idx_extensions,
-            allow_missing=True,
-        ),
         result_vcf=f"{output_genotyped}/{{condition}}/{{sample}}.vcf.gz",
         var_regions=config["beds"]["with_flank"],
         fasta_ref=config["starting_prg"]["fasta_ref"],
     output:
-        alignment_file=f"{output_alignments}/{{calls}}/{{condition}}_{{sample}}.sam",
-    params:
         gene_portions=(
-            f"{output_alignments}/{{calls}}/gene_portions/{{condition}}_{{sample}}.fa"
+            f"{output_alignments}/gene_portions/{{calls}}/{{condition}}_{{sample}}.fa"
         ),
+    params:
         idx_prefix=f"{output_bowtie_indexes}/{{sample}}",
         applied_filter=lambda wildcards: filters[wildcards.calls],
-    resources:
-        mem_mb=4000,
     shadow:
         "shallow"
     shell:
         """
-        mkdir -p $(dirname {params.gene_portions}) $(dirname {output.alignment_file})
-        > {params.gene_portions}
+        mkdir -p $(dirname {output.gene_portions}) 
+        > {output.gene_portions}
         bcftools filter {params.applied_filter} {input.result_vcf} -Oz -o used.vcf.gz
         bcftools index used.vcf.gz
         IFS="\n"; for gene_line in $(cat {input.var_regions})
@@ -193,16 +187,54 @@ rule tb_align_induced_gene_seqs:
             reg="${{elems[0]}}:${{adjusted_start}}-${{elems[2]}}"
             gene_name=${{elems[3]}}
             samtools faidx {input.fasta_ref} $reg | bcftools consensus -s {wildcards.sample} used.vcf.gz |
-                sed 's/>.*/>'${{gene_name}}'/' >> {params.gene_portions}
+                sed 's/>.*/>'${{gene_name}}'/' >> {output.gene_portions}
         done
-        bowtie2 -x {params.idx_prefix} -U {params.gene_portions} -f > {output.alignment_file}
+        """
+
+rule tb_align_gene_portions_bowtie2:
+    input:
+        truth_ref_idx=expand(
+            f"{output_bowtie_indexes}/{{sample}}.{{ext}}",
+            ext=bowtie2_idx_extensions,
+            allow_missing=True,
+        ),
+        gene_portions=rules.tb_produce_gene_portions.output,
+    output:
+        alignment_file=f"{output_alignments}/bowtie2/{{calls}}/{{condition}}_{{sample}}.sam",
+    params:
+        idx_prefix=f"{output_bowtie_indexes}/{{sample}}",
+    resources:
+        mem_mb=4000,
+    shell:
+        """
+        mkdir -p $(dirname {output.alignment_file})
+        bowtie2 -x {params.idx_prefix} -U {input.gene_portions} -f > {output.alignment_file}
+        """
+
+
+rule tb_align_gene_portions_minimap2:
+    input:
+        assembly=get_assembly,
+        gene_portions=rules.tb_produce_gene_portions.output,
+    output:
+        ori_alignment_file=f"{output_alignments}/minimap2/{{calls}}/original/{{condition}}_{{sample}}.sam",
+        alignment_file=f"{output_alignments}/minimap2/{{calls}}/{{condition}}_{{sample}}.sam",
+    resources:
+        mem_mb=4000,
+    shell:
+        """
+        mkdir -p $(dirname {output.ori_alignment_file})
+        minimap2 -a {input.assembly} {input.gene_portions} > {output.ori_alignment_file}
+        """
+        f"""
+        python3 {config["scripts"]}/{WORKFLOW}/add_NW_eddist.py {{output.ori_alignment_file}} {{input.assembly}} {{output.alignment_file}} --num_seqs {num_regions}
         """
 
 
 rule tb_process_alignments:
     input:
         alignments=expand(
-            f"{output_alignments}/{{calls}}/{{condition}}_{{sample}}.sam",
+            f"{output_alignments}/{{mapper}}/{{calls}}/{{condition}}_{{sample}}.sam",
             condition=conditions,
             sample=SAMPLES,
             allow_missing=True,
@@ -210,30 +242,26 @@ rule tb_process_alignments:
         var_regions=config["beds"]["with_flank"],
         mask_bed=config["beds"]["ilmn_asm_mask"],
     output:
-        stats=f"{output_plots}/{{calls}}_stats.tsv",
-        alignment_mask=f"{output_plots}/{{calls}}/alignment_mask_overlap.bed",
+        stats=f"{output_plots}/{{mapper}}/{{calls}}_stats.tsv",
     shadow:
         "shallow"
     shell:
         f"""
-        # Compute coverage of mask to alignment intervals
-        python3 {config["scripts"]}/{WORKFLOW}/make_alignment_beds.py {output_alignments}/{{wildcards.calls}} alignment.bed
-        bedtools coverage -a alignment.bed -b {{input.mask_bed}} > {{output.alignment_mask}}
-        python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments}/{{wildcards.calls}} {{input.var_regions}} {{output.stats}} --mask_bed {{output.alignment_mask}}
+        python3 {config["scripts"]}/{VALIDATION_WORKFLOW}/process_alignments.py {output_alignments}/{{wildcards.mapper}}/{{wildcards.calls}} {{input.var_regions}} {{output.stats}}
         """
 
 
 rule tb_plot_alignments:
     input:
-        stats=f"{output_plots}/{{calls}}_stats.tsv",
+        stats=f"{output_plots}/{{mapper}}/{{calls}}_stats.tsv",
     output:
         expand(
-            f"{output_plots}/{{calls}}/{{plot_name}}_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
+            f"{output_plots}/{{mapper}}/{{calls}}/{{plot_name}}_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
             plot_name=["ecdf", "upset"],
             allow_missing=True,
         ),
     shell:
         f"""
-        mkdir -p {output_plots}/{{wildcards.calls}}
-            Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots}/{{wildcards.calls}} {GMTOOLS_COMMIT}
+        mkdir -p {output_plots}/{{wildcards.mapper}}/{{wildcards.calls}}
+        Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots}/{{wildcards.mapper}}/{{wildcards.calls}} {GMTOOLS_COMMIT}
         """

@@ -1,3 +1,10 @@
+"""
+Computes stats from sam alignments: NM (edit distance between query and target), AS
+(alignment score), MAPQ (probability that alignment is not unique).
+
+And writes the stats to a tsv file.
+"""
+
 from collections import namedtuple
 from typing import Dict, Tuple, List
 from pathlib import Path
@@ -20,7 +27,7 @@ MaskDict = Dict[str, float]
 def load_mask_bed(mask_bed: click.Path) -> MaskDict:
     """
     Loads the amount of overlap between an aligned region and a mask
-    of low-quality regions. 
+    of low-quality regions.
     The key to the returned dict is a composite of alignment query, target and condition.
     """
     result = dict()
@@ -148,7 +155,8 @@ def write_stats(
 
 @click.command()
 @click.argument(
-    "input_dir", type=click.Path(exists=True),
+    "input_dir",
+    type=click.Path(exists=True),
 )
 @click.argument("input_bed", type=click.Path(exists=True))
 @click.argument("output_file", type=str)
