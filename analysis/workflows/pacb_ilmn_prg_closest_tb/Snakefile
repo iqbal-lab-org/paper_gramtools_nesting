@@ -41,7 +41,6 @@ GMTOOLS_COMMIT = get_gmtools_commit()
 output_base = Path(f'{config["output_dir"]}/{WORKFLOW}/')
 output_alignments = output_base / "alignments"
 output_closest = output_base / "prg_closest"
-output_prelim_stats = output_closest / "prelim_stats"
 output_indexes = output_base / "indexes"
 output_fastas = output_indexes / "fasta"
 output_prgs = output_indexes / "prgs"
@@ -113,7 +112,7 @@ rule tb_bowtie2_align_to_assemblies:
         bowtie2 -x {params.index_prefix} -U {input.gene_portions} -f > {output.alignment_file}
         """
 
-rule tb_align_gene_portions_minimap2:
+rule tb_minimap2_align_to_assemblies:
     input:
         gene_portions=f"{input_sequences_dir}/{{gene}}.fa",
         assembly=f'{config["assemblies_dir"]}/{{assembly}}.fasta.gz',
@@ -137,7 +136,7 @@ rule get_stats:
         alignment_file=f"{output_alignments}/{{mapper}}/{{assembly}}_{{gene}}.sam",
         var_bed=config["beds"]["with_flank"],
     output:
-        stats_file=temp(f"{output_prelim_stats}/{{mapper}}/{{assembly}}_{{gene}}.tsv"),
+        stats_file=f"{output_closest}/{{mapper}}/{{assembly}}_{{gene}}.tsv",
     params:
         script=f'{config["scripts"]}/pacb_ilmn_prg_closest/process_alignments.py',
     shell:
@@ -148,11 +147,10 @@ rule get_stats:
 
 rule tb_gramtools_induce_in_prg:
     input:
-        stats_file=f"{output_prelim_stats}/{{mapper}}/{{assembly}}_{{gene}}.tsv",
+        stats_file=f"{output_closest}/{{mapper}}/{{assembly}}_{{gene}}.tsv",
         fa=f"{output_fastas}/{{gene}}.fa",
         prg=f"{output_prgs}/{{gene}}",
     output:
-        stats_file=f"{output_closest}/{{mapper}}/{{assembly}}_{{gene}}.tsv",
         json_file=f"{output_induced}/{{mapper}}/{{assembly}}_{{gene}}_closest_in_prg_mapq_40.json",
     params:
         odir=f"{output_induced}/{{mapper}}",
@@ -160,18 +158,16 @@ rule tb_gramtools_induce_in_prg:
         "shallow"
     shell:
         """
-        mkdir -p $(dirname {output.stats_file}) $(dirname {output.json_file})
+        mkdir -p $(dirname {output.json_file})
         IFS="\n"; for line in $(cat {input.stats_file})
         do
             IFS="\t"; elems=($line); seq_name=${{elems[4]}}; condition=${{elems[3]}}
-            newline=$(echo ${{elems[@]}} | tr ' ' '\t' | tr -d '\n')
+            #newline=$(echo ${{elems[@]}} | tr ' ' '\t' | tr -d '\n')
             if [[ $seq_name == "NA" ]]; then
-                echo -e "${{newline}}\t0" > {output.stats_file}
                 touch {output.json_file}
             else
                 samtools faidx {input.fa} ${{seq_name}} > best.fa
                 gramtools simulate --prg {input.prg} -i best.fa --sample_id {wildcards.assembly}_{wildcards.gene}_${{condition}} -o {params.odir} --force
-                echo -e "${{newline}}\t1" > {output.stats_file}
             fi
         done
         """
