@@ -62,7 +62,7 @@ gramtools_genotyped = Path(f'{config["output_dir"]}/tb_bigdel/genotyped/gramtool
 rule all:
     input:
         expand(f'{output_eval}/eval_stats_{{mapper}}.tsv', mapper=["bowtie2", "minimap2"]),
-        expand(f'{output_base}/closest_stats_{{mapper}}.tsv"', mapper=["bowtie2", "minimap2"]),
+        expand(f'{output_base}/closest_stats_{{mapper}}.tsv', mapper=["bowtie2", "minimap2"]),
 
 
 rule index_input_seqs:
@@ -162,7 +162,6 @@ rule tb_gramtools_induce_in_prg:
         IFS="\n"; for line in $(cat {input.stats_file})
         do
             IFS="\t"; elems=($line); seq_name=${{elems[4]}}; condition=${{elems[3]}}
-            #newline=$(echo ${{elems[@]}} | tr ' ' '\t' | tr -d '\n')
             if [[ $seq_name == "NA" ]]; then
                 touch {output.json_file}
             else
@@ -182,10 +181,10 @@ rule concat_stats:
             allow_missing=True,
         ),
     output:
-        f'{output_base}/closest_stats_{{mapper}}.tsv"',
+        f'{output_base}/closest_stats_{{mapper}}.tsv',
     shell:
         """
-        echo "gene\tsample\tNM\tcondition\tquery\tfound_in_prg" > {output}
+        echo "gene\tsample\tNM\tcondition\tquery" > {output}
         cat {input} >> {output}
         """
 
