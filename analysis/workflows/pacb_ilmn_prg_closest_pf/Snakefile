@@ -26,6 +26,7 @@ ASSEMBLIES = get_samples(config["sample_tsv"], excluded)
 include: "../make_prgs/utils.py"
 include: "../common_utils.py"
 
+
 GMTOOLS_COMMIT = get_gmtools_commit()
 
 vcfs = load_vcf_names(config["vcf_list"], "pf_4surfants")
@@ -58,15 +59,17 @@ validation_stats = Path(
     f'{config["output_dir"]}/pacb_ilmn_validation/pf_4surfants/plots/{GMTOOLS_COMMIT}/stats.tsv'
 )
 input_prgs_dir = Path(f'{config["output_dir"]}/make_prgs/pf_4surfants/prgs/mn5_mml7')
-gramtools_genotyped = Path(f'{config["output_dir"]}/pacb_ilmn_validation/pf_4surfants/gramtools_{GMTOOLS_COMMIT}')
+gramtools_genotyped = Path(
+    f'{config["output_dir"]}/pacb_ilmn_validation/pf_4surfants/gramtools_{GMTOOLS_COMMIT}'
+)
 
 
 # __Genomic regions__'
 regions = dict()
 with open(config["beds"]["with_flank"]) as fin:
-   for line in fin:
-        elems = line.strip().split("\t") 
-        regions[elems[3]] = f'{elems[0]}:{int(elems[1])+1}-{elems[2]}'
+    for line in fin:
+        elems = line.strip().split("\t")
+        regions[elems[3]] = f"{elems[0]}:{int(elems[1])+1}-{elems[2]}"
 
 
 rule all:
@@ -125,6 +128,7 @@ rule cat_var_portions:
                     sequence = fin.read()
                 fout.write(sequence)
 
+
 rule index_input_seqs:
     input:
         gene_portions=f"{input_sequences_dir}/{{gene}}.fa",
@@ -136,6 +140,7 @@ rule index_input_seqs:
         cp {input} {output.fa}
         samtools faidx {output.fa}
         """
+
 
 rule index_input_prg:
     input:
@@ -151,6 +156,7 @@ rule index_input_prg:
         echo -e "\t\t\t{{wildcards.gene}}" > to_concat.txt
         python3 {{params.concat_prg_script}} {input_prgs_dir} to_concat.txt {{output.prg}}
         """
+
 
 rule align_to_assemblies:
     input:
@@ -183,6 +189,7 @@ rule get_stats:
         python3 {params.script} --min_qlen 500 {input.alignment_file} {input.var_bed} {output}
         """
 
+
 rule pf_gramtools_induce_in_prg:
     input:
         stats_file=f"{output_prelim_stats}/{{assembly}}_{{gene}}.tsv",
@@ -190,7 +197,9 @@ rule pf_gramtools_induce_in_prg:
         prg=f"{output_prgs}/{{gene}}",
     output:
         stats_file=f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
-        json_file=f"{output_induced}/{{assembly}}_{{gene}}_closest_in_prg_mapq_40.json",
+        json_file=(
+            f"{output_induced}/{{assembly}}_{{gene}}_closest_in_prg_mapq_40.json"
+        ),
     params:
         odir=output_induced,
     shadow:
@@ -213,6 +222,7 @@ rule pf_gramtools_induce_in_prg:
         done
         """
 
+
 rule concat_stats:
     input:
         expand(
@@ -228,12 +238,13 @@ rule concat_stats:
         cat {input} >> {output}
         """
 
+
 rule pf_evaluate_jvcf:
     input:
         json_truth=rules.pf_gramtools_induce_in_prg.output.json_file,
-        json_gtyped=f'{gramtools_genotyped}/{{assembly}}/genotype/genotyped.json',
+        json_gtyped=f"{gramtools_genotyped}/{{assembly}}/genotype/genotyped.json",
     output:
-        f'{output_eval}/{{assembly}}_{{gene}}.tsv',
+        f"{output_eval}/{{assembly}}_{{gene}}.tsv",
     params:
         eval_script=f'{config["scripts"]}/pacb_ilmn_prg_closest/evaluate_jvcf.py',
         region=lambda wildcards: regions[wildcards.gene],
@@ -245,12 +256,11 @@ rule pf_evaluate_jvcf:
         fi
         """
 
+
 rule concat_evals:
     input:
         expand(
-            f"{output_eval}/{{assembly}}_{{gene}}.tsv",
-            assembly=ASSEMBLIES,
-            gene=GENES,
+            f"{output_eval}/{{assembly}}_{{gene}}.tsv", assembly=ASSEMBLIES, gene=GENES,
         ),
     output:
         str(output_base / f"eval_stats_{GMTOOLS_COMMIT}.tsv"),

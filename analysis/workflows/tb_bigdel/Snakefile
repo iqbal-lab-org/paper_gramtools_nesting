@@ -54,7 +54,8 @@ SAMPLES = get_samples(config["sample_tsv"])
 ref_name = Path(config["starting_prg"]["fasta_ref"]).stem
 
 with open(config["beds"]["with_flank"]) as fin:
-    num_regions=len(fin.readlines())
+    num_regions = len(fin.readlines())
+
 
 localrules:
     all,
@@ -86,7 +87,7 @@ rule all:
         ),
         plots=expand(
             f"{output_plots}/{{mapper}}/{{calls}}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
-            mapper=["bowtie2","minimap2"],
+            mapper=["bowtie2", "minimap2"],
             calls=filters.keys(),
         ),
 
@@ -191,6 +192,7 @@ rule tb_produce_gene_portions:
         done
         """
 
+
 rule tb_align_gene_portions_bowtie2:
     input:
         truth_ref_idx=expand(
@@ -200,7 +202,9 @@ rule tb_align_gene_portions_bowtie2:
         ),
         gene_portions=rules.tb_produce_gene_portions.output,
     output:
-        alignment_file=f"{output_alignments}/bowtie2/{{calls}}/{{condition}}_{{sample}}.sam",
+        alignment_file=(
+            f"{output_alignments}/bowtie2/{{calls}}/{{condition}}_{{sample}}.sam"
+        ),
     params:
         idx_prefix=f"{output_bowtie_indexes}/{{sample}}",
     resources:
@@ -218,7 +222,9 @@ rule tb_align_gene_portions_minimap2:
         gene_portions=rules.tb_produce_gene_portions.output,
     output:
         ori_alignment_file=f"{output_alignments}/minimap2/{{calls}}/original/{{condition}}_{{sample}}.sam",
-        alignment_file=f"{output_alignments}/minimap2/{{calls}}/{{condition}}_{{sample}}.sam",
+        alignment_file=(
+            f"{output_alignments}/minimap2/{{calls}}/{{condition}}_{{sample}}.sam"
+        ),
     resources:
         mem_mb=4000,
     shell:

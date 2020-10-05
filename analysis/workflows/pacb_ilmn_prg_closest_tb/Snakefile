@@ -22,9 +22,8 @@ regions = dict()
 with open(config["beds"]["with_flank"]) as fin:
     for line in fin:
         GENES.append(line.strip().split("\t")[3])
-        elems = line.strip().split("\t") 
-        regions[elems[3]] = f'{elems[0]}:{int(elems[1])+1}-{elems[2]}'
-
+        elems = line.strip().split("\t")
+        regions[elems[3]] = f"{elems[0]}:{int(elems[1])+1}-{elems[2]}"
 
 
 # regions have '_' in their name, make sure that doesnt get used by assembly wildcard
@@ -35,6 +34,7 @@ wildcard_constraints:
 
 # ____Output paths___#
 include: "../common_utils.py"
+
 
 GMTOOLS_COMMIT = get_gmtools_commit()
 
@@ -56,13 +56,20 @@ input_prgs_dir = Path(f'{config["output_dir"]}/make_prgs/tb_bigdel/prgs/mn5_mml7
 validation_stats = Path(
     f'{config["output_dir"]}/tb_bigdel/plots/callsunfiltered_stats.tsv'
 )
-gramtools_genotyped = Path(f'{config["output_dir"]}/tb_bigdel/genotyped/gramtools_{GMTOOLS_COMMIT}')
+gramtools_genotyped = Path(
+    f'{config["output_dir"]}/tb_bigdel/genotyped/gramtools_{GMTOOLS_COMMIT}'
+)
 
 
 rule all:
     input:
-        expand(f'{output_eval}/eval_stats_{{mapper}}.tsv', mapper=["bowtie2", "minimap2"]),
-        expand(f'{output_base}/closest_stats_{{mapper}}.tsv', mapper=["bowtie2", "minimap2"]),
+        expand(
+            f"{output_eval}/eval_stats_{{mapper}}.tsv", mapper=["bowtie2", "minimap2"]
+        ),
+        expand(
+            f"{output_base}/closest_stats_{{mapper}}.tsv",
+            mapper=["bowtie2", "minimap2"],
+        ),
 
 
 rule index_input_seqs:
@@ -93,6 +100,7 @@ rule index_input_prg:
         python3 {{params.concat_prg_script}} {input_prgs_dir} to_concat.txt {{output.prg}}
         """
 
+
 rule tb_bowtie2_align_to_assemblies:
     input:
         gene_portions=f"{input_sequences_dir}/{{gene}}.fa",
@@ -112,12 +120,15 @@ rule tb_bowtie2_align_to_assemblies:
         bowtie2 -x {params.index_prefix} -U {input.gene_portions} -f > {output.alignment_file}
         """
 
+
 rule tb_minimap2_align_to_assemblies:
     input:
         gene_portions=f"{input_sequences_dir}/{{gene}}.fa",
         assembly=f'{config["assemblies_dir"]}/{{assembly}}.fasta.gz',
     output:
-        ori_alignment_file=f"{output_alignments}/minimap2/original/{{assembly}}_{{gene}}.sam",
+        ori_alignment_file=(
+            f"{output_alignments}/minimap2/original/{{assembly}}_{{gene}}.sam"
+        ),
         alignment_file=f"{output_alignments}/minimap2/{{assembly}}_{{gene}}.sam",
     resources:
         mem_mb=5000,
@@ -144,6 +155,7 @@ rule get_stats:
         mkdir -p $(dirname {output.stats_file})
         python3 {params.script} --min_qlen 500 {input.alignment_file} {input.var_bed} {output}
         """
+
 
 rule tb_gramtools_induce_in_prg:
     input:
@@ -181,19 +193,20 @@ rule concat_stats:
             allow_missing=True,
         ),
     output:
-        f'{output_base}/closest_stats_{{mapper}}.tsv',
+        f"{output_base}/closest_stats_{{mapper}}.tsv",
     shell:
         """
         echo "gene\tsample\tNM\tcondition\tquery" > {output}
         cat {input} >> {output}
         """
 
+
 rule tb_evaluate_jvcf:
     input:
         json_truth=rules.tb_gramtools_induce_in_prg.output.json_file,
-        json_gtyped=f'{gramtools_genotyped}/{{assembly}}/genotype/genotyped.json',
+        json_gtyped=f"{gramtools_genotyped}/{{assembly}}/genotype/genotyped.json",
     output:
-        f'{output_eval}/{{mapper}}/{{assembly}}_{{gene}}.tsv',
+        f"{output_eval}/{{mapper}}/{{assembly}}_{{gene}}.tsv",
     params:
         eval_script=f'{config["scripts"]}/pacb_ilmn_prg_closest/evaluate_jvcf.py',
         region=lambda wildcards: regions[wildcards.gene],
@@ -205,6 +218,7 @@ rule tb_evaluate_jvcf:
         fi
         """
 
+
 rule concat_evals:
     input:
         expand(
@@ -214,7 +228,7 @@ rule concat_evals:
             allow_missing=True,
         ),
     output:
-        f'{output_eval}/eval_stats_{{mapper}}.tsv',
+        f"{output_eval}/eval_stats_{{mapper}}.tsv",
     params:
         eval_script=f'{config["scripts"]}/pacb_ilmn_prg_closest/evaluate_jvcf.py',
     shell:
@@ -222,6 +236,7 @@ rule concat_evals:
         python3 {params.eval_script} -p > {output}
         cat {input} >> {output}
         """
+
 
 rule plot_delta_NM:
     input:
