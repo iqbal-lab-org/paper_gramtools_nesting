@@ -2,6 +2,6 @@ datasets : "analysis/configs/nestedness_simulations/datasets.tsv"
 
 k : 10
 
-num_simu_paths : 5
-simu_read_params: {err_scaling: [0, -20], fcov: [40]}
+num_simu_paths : 10
+simu_read_params: {err_scaling: [0], fcov: [40]}
 read_len : 75

@@ -115,20 +115,25 @@ prg_name = argv$dataset_name
 data <- data %>% mutate(classif = pmap_chr(list(res_has_call, res_is_correct), get_classif))
 
 prg_data <- data %>% filter(prg == prg_name) 
-print(sprintf("Num filtered out ambiguous sites for prg %s: %d out of %d",
-              prg_name, table(prg_data$ambiguous)[2], dim(prg_data)[1]))
+data_noambi <- filter(data, genotyped_ambiguous == 0)
 
-data_noambi <- filter(data, ambiguous == 0)
+num_in_prg <- dim(prg_data)[1]
 prg_data <- data_noambi %>% filter(prg == prg_name) 
+print(sprintf("Num filtered out ambiguous sites for prg %s: %d out of %d",
+              prg_name, num_in_prg - dim(prg_data)[1], num_in_prg))
 
 data_lvl1 <- filter(prg_data, lvl_1 == 1)
 all_data_fixed <- filter(data_noambi, err_rate==0)
+data_nestedmostsites <- filter(all_data_fixed, num_child_sites == 0)
 
 plot_prec_recall(data_noambi, "precision_recall.pdf", argv, prg_name, gmtools_commit)
 plot_prec_recall(data_lvl1, "precision_recall_lvl1.pdf", argv, prg_name, gmtools_commit)
 plot_prec_recall(all_data_fixed, "precision_recall_all.pdf", argv,  "all genes", gmtools_commit, faceted = FALSE)
+plot_prec_recall(data_nestedmostsites, "precision_recall_all_nestedmostsites.pdf", argv, "all genes", gmtools_commit, faceted=FALSE)
+print_prec_recall(all_data_fixed)
 
 plot_GC(data_noambi, "GC_distrib.pdf", argv, prg_name, gmtools_commit)
 plot_GC(all_data_fixed, "GC_distrib_all.pdf", argv, "all genes", gmtools_commit, faceted=FALSE)
+plot_GC(data_nestedmostsites, "GC_distrib_all_nestedmostsites.pdf", argv, "all genes", gmtools_commit, faceted=FALSE)
 
 plot_GCP(data_noambi, "GCP_distrib.pdf", argv, prg_name, gmtools_commit)

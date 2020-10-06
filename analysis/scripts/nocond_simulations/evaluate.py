@@ -33,7 +33,8 @@ columns = [
     "cov_other_alleles",
     "site_num",
     "site_pos",
-    "ambiguous",
+    "genotyped_ambiguous",
+    "truth_ambiguous",
     "num_child_sites",
 ]
 result_template = {k: "NA" for k in columns}

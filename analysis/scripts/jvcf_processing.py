@@ -1,7 +1,7 @@
 """
 Helper code to process JSON VCFs made by gramtools
 """
-from typing import NamedTuple, Optional, Dict, List, Union
+from typing import NamedTuple, Optional, Dict, Set, List, Union
 import re
 from collections import namedtuple
 
@@ -134,6 +134,10 @@ def get_called_allele(sample_index: int, site_json: SiteJson) -> AlleleCall:
     return AlleleCall(allele_index, allele)
 
 
+def is_nested(lvl1sites: Set, site_idx: int) -> bool:
+    return site_idx not in lvl1sites
+
+
 def num_sites_under(child_map: Dict, site_idx: str) -> int:
     result = 0
     to_visit: List[int] = [site_idx]
@@ -194,9 +198,12 @@ def evaluate_site(
         "gt_allele",
         "cov_gt_allele",
         "cov_other_alleles",
-        "ambiguous",
+        "genotyped_ambiguous",
+        "truth_ambiguous",
     ]
     result = FixedDict({k: "NA" for k in result_fields})
+    result["genotyped_ambiguous"] = 0
+    result["truth_ambiguous"] = 0
 
     truth_call = get_called_allele(truth_sample_index, truth)
 
@@ -227,8 +234,8 @@ def evaluate_site(
         result["cov_other_alleles"] -= cov_gt_allele
 
     if "AMBIG" in get_indexed_attribute(genotyped, "FT", genotyped_sample_index):
-        result["ambiguous"] = 1
-    else:
-        result["ambiguous"] = 0
+        result["genotyped_ambiguous"] = 1
+    if "AMBIG" in get_indexed_attribute(truth, "FT", truth_sample_index):
+        result["truth_ambiguous"] = 1
 
     return result

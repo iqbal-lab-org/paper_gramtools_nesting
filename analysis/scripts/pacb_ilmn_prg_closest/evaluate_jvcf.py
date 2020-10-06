@@ -10,6 +10,7 @@ from jvcf_processing import (
     evaluate_site,
     first_idx_in_region,
     get_n_sites_starting_from_region,
+    is_nested,
     num_sites_under,
 )
 
@@ -27,10 +28,13 @@ result_fields = [
     "edit_dist",
     "cov_gt_allele",
     "cov_other_alleles",
-    "site_num",
+    "genotyped_site_num",
+    "truth_site_num",
     "POS",
-    "ambiguous",
+    "genotyped_ambiguous",
+    "truth_ambiguous",
     "num_child_sites",
+    "is_nested",
 ]
 
 
@@ -69,6 +73,7 @@ def main(genotyped_jvcf, truth_jvcf, region: Region, output_file):
         genotyped = json.load(fone)
         truth = json.load(ftwo)
 
+    lvl1sites = truth["Lvl1_Sites"]
     truth_sites = truth["Sites"]
     genotyped_sites = genotyped["Sites"]
     site_num = first_idx_in_region(genotyped_sites, region)
@@ -97,14 +102,11 @@ def main(genotyped_jvcf, truth_jvcf, region: Region, output_file):
 
         next_result["POS"] = called_site_json["POS"]
 
+        next_result["is_nested"] = is_nested(lvl1sites, i)
         next_result["num_child_sites"] = num_sites_under(truth["Child_Map"], str(i))
 
-        # Make sure no new keys will be introduced
-        next_result.update(
-            {key: val for key, val in eval_results.items() if key in next_result}
-        )
-
-        next_result["site_num"] = site_num
+        next_result["genotyped_site_num"] = site_num
+        next_result["truth_site_num"] = i
         site_num += 1
         # print("\t".join(map(str, next_result.values())) + "\n")
         fout.write("\t".join(map(str, next_result.values())) + "\n")

@@ -46,16 +46,14 @@ output_fastas = output_indexes / "fasta"
 output_prgs = output_indexes / "prgs"
 output_induced = output_base / "induced"
 output_eval = output_base / "eval_jvcf" / f"gramtools_{GMTOOLS_COMMIT}"
-output_plots = output_base / "plots" / GMTOOLS_COMMIT
+output_plots = output_base / "plots" / f"gramtools_{GMTOOLS_COMMIT}"
 mk_output_dirs(dir())
 
 # __Input paths__#
 output_bowtie_indexes = Path(f'{config["output_dir"]}/tb_bigdel/bowtie_indexes')
 input_sequences_dir = Path(f'{config["output_dir"]}/make_prgs/tb_bigdel/msas')
 input_prgs_dir = Path(f'{config["output_dir"]}/make_prgs/tb_bigdel/prgs/mn5_mml7')
-validation_stats = Path(
-    f'{config["output_dir"]}/tb_bigdel/plots/callsunfiltered_stats.tsv'
-)
+gramtools_tsv = Path(f'{config["output_dir"]}/tb_bigdel/plots/{GMTOOLS_COMMIT}/minimap2/callsunfiltered_stats.tsv')
 gramtools_genotyped = Path(
     f'{config["output_dir"]}/tb_bigdel/genotyped/gramtools_{GMTOOLS_COMMIT}'
 )
@@ -70,6 +68,7 @@ rule all:
             f"{output_base}/closest_stats_{{mapper}}.tsv",
             mapper=["bowtie2", "minimap2"],
         ),
+        f"{output_plots}/ROC_curve_no_fpnull.pdf",
 
 
 rule index_input_seqs:
@@ -237,11 +236,24 @@ rule concat_evals:
         cat {input} >> {output}
         """
 
+rule plot_eval_perfs:
+    input:
+        gramtools_tsv = gramtools_tsv,
+        prg_closest_tsv=f"{output_base}/closest_stats_minimap2.tsv",
+        eval_tsv=f"{output_eval}/eval_stats_minimap2.tsv",
+    output:
+        f"{output_plots}/ROC_curve.pdf",
+    shell:
+        f"""
+        python3 {config["scripts"]}/pacb_ilmn_prg_closest/GCP_roc_curve.py {{input.gramtools_tsv}} {{input.prg_closest_tsv}} {{input.eval_tsv}} {output_plots}
+        Rscript {config["scripts"]}/pacb_ilmn_prg_closest/plot_roc.R {output_plots}/ROC_stats.tsv {output_plots} all
+        Rscript {config["scripts"]}/pacb_ilmn_prg_closest/plot_roc.R {output_plots}/ROC_stats_no_fpnull.tsv {output_plots} no_fpnull
+        """
 
 rule plot_delta_NM:
     input:
         closest_prg_stats=rules.concat_stats.output,
-        validation_stats=validation_stats,
+        validation_stats=gramtools_tsv,
     output:
         expand(f"{output_plots}/{{gene}}_gmtools_delta.pdf", gene=GENES),
     params:

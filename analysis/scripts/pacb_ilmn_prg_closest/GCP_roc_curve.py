@@ -10,6 +10,7 @@ from typing import NewType, Optional, Set, Dict, List
 from pathlib import Path
 from dataclasses import dataclass
 from math import isnan
+import logging
 
 import click
 import pandas as pd
@@ -63,7 +64,7 @@ def load_gramtools_tsv(gramtools_tsv) -> Deltas:
         if key in deltas:
             raise ValueError(f"region {key} found twice in the gramtools tsv")
         deltas[key] = EvaluatedGene(row.NM)
-    print(
+    logging.info(
         f"Gramtools genotyping \n Num no NM: {num_no_NM} \n Num MAPQ <= 40: {num_low_mapq}"
         f"\n Num used regions: {len(deltas)}"
     )
@@ -86,12 +87,13 @@ def load_prg_closest_tsv(prg_closest_tsv, deltas: Deltas) -> None:
         if key not in deltas:
             continue
         deltas[key].set_prg_closest(row.NM)
-    print(f"Prg_closest \n Num no NM: {num_no_NM}")
+    logging.info(f"Prg_closest \n Num no NM: {num_no_NM}")
 
 
 class EvaluatedSite:
     GCP: float
     classif: Classif
+    fp_on_null_call: bool = False
 
     def __init__(self, tsv_line: pd.Series):
         self.GCP = tsv_line.GCP
@@ -100,13 +102,18 @@ class EvaluatedSite:
             raise ValueError(f"{classif} not in {classif_fields}")
         self.classif = classif
 
+        if classif == "FP" and tsv_line.truth_allele == "":
+            self.fp_on_null_call = True
+
 
 Classifs = List[EvaluatedSite]
 
 
 def load_eval_tsv(eval_tsv, deltas: Deltas) -> Classifs:
+    num_nested, num_nonested = 0, 0
     classifs = list()
     df = pd.read_table(eval_tsv)
+    df["truth_allele"] = df["truth_allele"].fillna("")
     for row in df.itertuples():
         key = f"{row.sample}_{row.gene}"
         if key not in deltas:
@@ -115,10 +122,18 @@ def load_eval_tsv(eval_tsv, deltas: Deltas) -> Classifs:
             continue
         if row.num_child_sites != 0:
             continue
-        if row.ambiguous:
+        if row.genotyped_ambiguous or row.truth_ambiguous:
             continue
+        if row.is_nested:
+            num_nested += 1
+        else:
+            num_nonested += 1
         classifs.append(EvaluatedSite(row))
     classifs.sort(key=lambda elem: elem.GCP, reverse=True)
+    logging.info(
+        f"Num evaluated sites: {len(classifs)},"
+        f" of which {num_nested} nested and {num_nonested} non-nested sites"
+    )
     return classifs
 
 
@@ -200,6 +215,11 @@ def get_roc_values(sites: Classifs) -> pd.DataFrame:
     return result
 
 
+def write_stats(classifs: Classifs, ofname: Path):
+    roc_df = get_roc_values(classifs)
+    roc_df.to_csv(ofname, sep="\t", index=False)
+
+
 @click.command()
 @click.argument("gramtools_tsv", type=click.Path(exists=True))
 @click.argument("closest_tsv", type=click.Path(exists=True))
@@ -207,6 +227,12 @@ def get_roc_values(sites: Classifs) -> pd.DataFrame:
 @click.argument("output_dir", type=Path)
 def main(gramtools_tsv, closest_tsv, evaluation_tsv, output_dir):
     output_dir.mkdir(exist_ok=True)
+    logfile = open(output_dir / "log.txt", "w")
+    logging.basicConfig(
+        format="%(message)s",
+        level=logging.INFO,
+        handlers=[logging.StreamHandler(logfile)],
+    )
 
     deltas: Dict[str, EvaluatedGene] = load_gramtools_tsv(gramtools_tsv)
     load_prg_closest_tsv(closest_tsv, deltas)
@@ -219,16 +245,17 @@ def main(gramtools_tsv, closest_tsv, evaluation_tsv, output_dir):
                 num_nonneg_delta += 1
         except ValueError as err:
             raise err
-    print(
+    logging.info(
         f"Total num loaded regions with NM in both gramtools and prg_closest: {len(deltas)}"
     )
-    print(
+    logging.info(
         f"Total num loaded regions with NM in gramtools >= NM in prg_closest: {num_nonneg_delta}"
     )
     classifs = load_eval_tsv(evaluation_tsv, deltas)
-    print(f"Num evaluated sites: {len(classifs)}")
-    roc_df = get_roc_values(classifs)
-    roc_df.to_csv(output_dir / "ROC_stats.tsv", sep="\t", index=False)
+    write_stats(classifs, output_dir / "ROC_stats.tsv")
+    classifs_nofpnulls = [elem for elem in classifs if not elem.fp_on_null_call]
+    write_stats(classifs_nofpnulls, output_dir / "ROC_stats_no_fpnull.tsv")
+    logfile.close()
 
 
 if __name__ == "__main__":
