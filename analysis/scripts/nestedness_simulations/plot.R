@@ -56,7 +56,7 @@ plot_prec_recall <- function(data, title, argv, prg_name, gmtools_commit, facete
   prec_recall <- ggplot(total, aes(metric,score)) + geom_bar(aes(fill=nesting), stat="identity",position="dodge") + 
     labs(title = plot_title, subtitle=plot_subtitle)
   if (faceted){
-    prec_recall <- prec_recall + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
+    #prec_recall <- prec_recall + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
     title<-paste(argv$dataset_name,title,sep="_")
   }
   ggsave(file.path(argv$output_dir,title),width = 8, height = 6, plot=prec_recall)
@@ -73,7 +73,7 @@ plot_GC <- function(data, title, argv, prg_name, gmtools_commit, faceted = TRUE,
   GC_boxplot <- ggplot(correctness, aes(classif, GC)) + geom_boxplot(aes(fill=nesting)) + 
     labs(title=plot_title) + xlab("Call classification") + ylab("Genotype confidence")
   if (faceted){
-    GC_boxplot <- GC_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
+    #GC_boxplot <- GC_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
     title<-paste(argv$dataset_name,title,sep="_")
   }
     
@@ -89,7 +89,7 @@ plot_GCP <- function(data, title, argv, prg_name, gmtools_commit, faceted = TRUE
   plot_title <- ""
   GCP_boxplot <- ggplot(correctness, aes(classif, GCP)) + geom_boxplot(aes(fill=nesting)) + labs(title=plot_title)
   if (faceted)
-    GCP_boxplot <- GCP_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
+    #GCP_boxplot <- GCP_boxplot + facet_grid(cols=vars(err_rate), rows=vars(fcov), labeller = label_both)
   
   title<-paste(argv$dataset_name,title,sep="_")
   ggsave(file.path(argv$output_dir,title),width = 8, height = 6, plot=GCP_boxplot)

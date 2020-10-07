@@ -78,24 +78,24 @@ df_unfiltered <- as_tibble(read.csv(argv$input_tsv, sep="\t"))
 conditions = as.character(unique(df_unfiltered$condition))
 gram_cond = conditions[grep("gramtools_*", conditions)]
 df_unfiltered$condition = replace(as.vector(df_unfiltered$condition), df_unfiltered$condition == gram_cond, "gramtools")
-conditions = as.character(unique(df_unfiltered$condition))
+df_unfiltered$condition = replace(as.vector(df_unfiltered$condition), df_unfiltered$condition == "baseline_ref", "baseline(H37Rv)")
 
 # Convert alignment NM below MAPQ threshold to NA
-df_mapq20 <- df_unfiltered
-df_mapq20$NM[df_unfiltered$MAPQ <= 20] <- NA
+df_mapq30 <- df_unfiltered
+df_mapq30$NM[df_unfiltered$MAPQ < 30] <- NA
 df_mapq40 <- df_unfiltered
-df_mapq40$NM[df_unfiltered$MAPQ <= 40] <- NA
+df_mapq40$NM[df_unfiltered$MAPQ < 40] <- NA
 
 ## Plot empirical cumulative distribution functions ##
 plot_ecdf(df_unfiltered, outdir, gram_commit, "unfiltered")
 plot_ecdf(df_unfiltered, outdir, gram_commit, "unfiltered_withunmapped", with_unmapped = TRUE)
-plot_ecdf(df_mapq20, outdir, gram_commit, "filtered_mapq20")
-plot_ecdf(df_mapq20, outdir, gram_commit, "filtered_mapq20_withunmapped", with_unmapped = TRUE)
+plot_ecdf(df_mapq30, outdir, gram_commit, "filtered_mapq30")
+plot_ecdf(df_mapq30, outdir, gram_commit, "filtered_mapq30_withunmapped", with_unmapped = TRUE)
 plot_ecdf(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 plot_ecdf(df_mapq40, outdir, gram_commit, "filtered_mapq40_withunmapped", with_unmapped = TRUE)
 
 write_mean_eddist(df_unfiltered, outdir, gram_commit, "unfiltered")
-write_mean_eddist(df_mapq20, outdir, gram_commit, "filtered_mapq20")
+write_mean_eddist(df_mapq30, outdir, gram_commit, "filtered_mapq30")
 write_mean_eddist(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 
 
@@ -110,13 +110,13 @@ library(UpSetR)
 
 plot_upset(df_unfiltered, outdir, gram_commit, "unfiltered")
 plot_upset(df_unfiltered, outdir, gram_commit, "unfiltered_unmapped", plot_missing = TRUE)
-plot_upset(df_mapq20, outdir, gram_commit, "filtered_mapq20")
-plot_upset(df_mapq20, outdir, gram_commit, "filtered_mapq20_unmapped", plot_missing = TRUE)
+plot_upset(df_mapq30, outdir, gram_commit, "filtered_mapq30")
+plot_upset(df_mapq30, outdir, gram_commit, "filtered_mapq30_unmapped", plot_missing = TRUE)
 plot_upset(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 plot_upset(df_mapq40, outdir, gram_commit, "filtered_mapq40_unmapped", plot_missing = TRUE)
 
 write_num_aligned(df_unfiltered, outdir, gram_commit, "unfiltered")
-write_num_aligned(df_mapq20, outdir, gram_commit, "filtered_mapq20")
+write_num_aligned(df_mapq30, outdir, gram_commit, "filtered_mapq30")
 write_num_aligned(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 
 ## Using ggupset package, interfaces with ggplot
@@ -135,8 +135,13 @@ write_num_aligned(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 
 ### Minimap2 results: look at unmapped, low mapq, and gramtools high edit distance sequences ##
 #df_unfiltered_minimap2 <- as_tibble(read.csv("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/tb_bigdel/plots/df3b1583/minimap2/callsunfiltered_stats.tsv",sep="\t"))
+#df_lowmapq_minimap2 <- df_unfiltered_minimap2 %>% filter(!is.na(MAPQ) & MAPQ<=40)
 #df_mapq_minimap2 <- df_unfiltered_minimap2
-#df_mapq_minimap2$NM[df_mapq_minimap2$MAPQ <= 20] <- NA
+#df_mapq_minimap2$NM[df_mapq_minimap2$MAPQ < 30] <- NA
+#max_NM <- max(df_mapq_minimap2$NM, na.rm = TRUE)
+#plotted_dataset <-df_mapq_minimap2 %>% replace_na(list(NM = max_NM))
+#ecdf_plot <- ggplot(plotted_dataset, aes(x = NM, colour = condition)) + stat_ecdf(geom="step", pad = FALSE)
+#df_mapq_minimap2 %>% group_by(condition) %>% summarise(dist=mean(NM,na.rm=TRUE))
 #long_missing_minimap2 <- df_mapq_minimap2 %>%
 #  mutate(missing = as.numeric(is.na(NM))) %>%
 #  select(sample, gene, condition, missing) %>%
@@ -152,3 +157,4 @@ write_num_aligned(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 #
 #long_NM_minimap2 <- long_NM_minimap2 %>% mutate(gramtools_diff=gramtools_df3b1583 - graphtyper2)
 #worse_than_gtyper2 <- long_NM_minimap2 %>% filter(gramtools_diff > 0)
+
