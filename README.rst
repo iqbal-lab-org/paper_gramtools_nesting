@@ -26,13 +26,11 @@ We provide scripts/commands to obtain all the data, see `below <Steps for setup_
   Accessions: analysis/input_data/pfalciparum/pf3k/bam_list.txt
 * M. tuberculosis 17 Illumina reads and matched PacBio assemblies. Illumina accessions: analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv. 
 * M. tuberculosis vcfs of 1,017 samples
-[] cortex vcfs on Pf3k
-[] cortex vcfs
 
 Steps for setup
 -------------------
 
-Setup commands and run commands work when issued from the root of this project.
+All commands work only when issued from the root of this project.
 
 Setup a python virtual environment and obtain snakemake::
     
@@ -40,7 +38,7 @@ Setup a python virtual environment and obtain snakemake::
     pip3 install pip==20.0.2 
     pip3 install -r pyrequirements.txt
 
-Obtain singularity container::
+Obtain the singularity container::
 
     # Download container:
     TODO
@@ -49,11 +47,22 @@ Obtain singularity container::
 
 Obtain input data::
 
+    ## P. falciparum data ##
     bash analysis/input_data/download_data/pf_dl_ilmn_ena.sh
     bash analysis/input_data/download_data/pf_dl_pacb_assemblies.sh
-    python3 analysis/input_data/download_data/mtb_dl_ilmn_ena.py
     # Below downloads >700 BAMs; recommend modifying the script to submit in parallel to a cluster
     bash analysis/input_data/download_data/pf_dl_ilmn_pf3k.sh
+
+    pf_vcfs="analysis/input_data/pfalciparum/pf3k/vcfs"
+    mkdir -p "$pf_vcfs"
+    [TODO] wget zenodo.com/nesting_paper/pf_vcfs.tar.gz
+
+    ## M. tuberculosis data ##
+    tb_vcfs="analysis/input_data/mtuberculosis/clockwork/vcfs"
+    mkdir -p "$tb_vcfs"
+    [TODO] wget zenodo.com/nesting_paper/tb_vcfs.tar.gz
+
+    python3 analysis/input_data/download_data/mtb_dl_ilmn_ena.py
 
 
 How to run a worfklow

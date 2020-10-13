@@ -14,7 +14,7 @@ mkdir -p "$bam_dir"
 
 for accession in $(cat ${samp_accessions})
 do
-    dl_command="wget -N ${pf3k_ftp}/${accession} -O ${bam_dir}/${accession}"
+    dl_command="wget -N -c -P ${bam_dir} ${pf3k_ftp}/${accession}"
 
     ## run as single job 
     eval $dl_command

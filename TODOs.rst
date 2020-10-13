@@ -16,7 +16,7 @@ reproducibility
 [] add Michael's singularity bind options + check singularity workdir
 
 [x] Re-run all workflows 
-[] pf3k bams: script to download them
+[x] pf3k bams: script to download them
 
 tb_bigdel
 =========
