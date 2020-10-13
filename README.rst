@@ -9,12 +9,30 @@ Requirements for setup
 --------------------------
 
 * Python >=3.6
-* Singularity>=v3.4.0-1 + root (or `fakeroot <https://sylabs.io/guides/3.5/user-guide/fakeroot.html>`_) privilege for building container
+* Singularity>=v3.4.0-1 
+  + if building container, root privilege (or use `fakeroot <https://sylabs.io/guides/3.5/user-guide/fakeroot.html>`_)
+
+
+Input data
+------------
+
+Here we list all the datasets used and where their accessions are listed if they are accessioned.
+We provide scripts/commands to obtain all the data, see `below <Steps for setup_>`.
+
+* P. falciparum 14 Illumina reads and matched PacBio assemblies.
+  Accessions: analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
+* P. falciparum vcfs of 2,500 samples
+* P. falciparum Illumina reads of 706 samples.
+  Accessions: analysis/input_data/pfalciparum/pf3k/bam_list.txt
+* M. tuberculosis 17 Illumina reads and matched PacBio assemblies. Illumina accessions: analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv. 
+* M. tuberculosis vcfs of 1,017 samples
+[] cortex vcfs on Pf3k
+[] cortex vcfs
 
 Steps for setup
 -------------------
 
-Setup commands and run commands should always be issued from the root of this project.
+Setup commands and run commands work when issued from the root of this project.
 
 Setup a python virtual environment and obtain snakemake::
     
@@ -22,13 +40,21 @@ Setup a python virtual environment and obtain snakemake::
     pip3 install pip==20.0.2 
     pip3 install -r pyrequirements.txt
 
-Build singularity container::
+Obtain singularity container::
 
-    sudo singularity build container/built/singu.sif container/singu_def.def 
+    # Download container:
+    TODO
+    # Or build container directly:
+    # sudo singularity build container/built/singu.sif container/singu_def.def 
 
 Obtain input data::
 
-    TODO
+    bash analysis/input_data/download_data/pf_dl_ilmn_ena.sh
+    bash analysis/input_data/download_data/pf_dl_pacb_assemblies.sh
+    python3 analysis/input_data/download_data/mtb_dl_ilmn_ena.py
+    # Below downloads >700 BAMs; recommend modifying the script to submit in parallel to a cluster
+    bash analysis/input_data/download_data/pf_dl_ilmn_pf3k.sh
+
 
 How to run a worfklow
 ----------------------
@@ -38,8 +64,6 @@ How to run a worfklow
     TODO: Below is ebi cluster + lsf-specific
     module load singularity/3.5.0
     bash analysis/cluster_submit.sh <workflow_name>
-
-* On ebi cluster: `module load singularity/3.[45].[0-9]`
 
 * Requires lsf profile for snakemake: https://github.com/Snakemake-Profiles/snakemake-lsf. 
     The non-defaults configs are: LSF_UNIT_FOR_LIMITS=MB, default_cluster_logdir=run/logs/lsf_profile

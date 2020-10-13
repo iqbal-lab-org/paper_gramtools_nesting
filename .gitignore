@@ -11,8 +11,8 @@ __pycache__
 *.swp
 
 # Inputs
-analysis/input_data/make_prgs/pf3k_cortex_vcfs
 analysis/input_data/pfalciparum/pf3k/bams
+analysis/input_data/pfalciparum/pf3k/vcfs
 analysis/input_data/pfalciparum/pacb_ilmn/ilmn_reads
 analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_reads
 analysis/input_data/pfalciparum/pacb_ilmn/pacb_assemblies

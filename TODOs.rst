@@ -11,11 +11,12 @@ reproducibility
 
 [x] container: install python env from requirements.txt. See martin's clockwork container setup for how to interact with repo on local filesystem.
 [x] container: RScript installing all dependencies in one go, called by singu def file.
-[] container: add enaDataGet for downloading from ENA?
-[] container: ensure can run scripts which rely on nesting_paper py package (installed in dev mode from analysis/scripts)
+[x] container: add enaDataGet for downloading from ENA?
+[x] container: ensure can run scripts which rely on nesting_paper py package (installed in dev mode from analysis/scripts)
 [] add Michael's singularity bind options + check singularity workdir
 
-[] Re-run all workflows 
+[x] Re-run all workflows 
+[] pf3k bams: script to download them
 
 tb_bigdel
 =========

@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 def get_one_run(run_id, outdir):
     command = f"enaDataGet --format fastq {run_id}"
@@ -43,9 +44,14 @@ def get_one_sample(sample_name, run_ids):
     for run_id in run_ids:
         shutil.rmtree(outdir / run_id)
 
+try:
+    base_dir = Path(sys.argv[1]).resolve()
+    assert base_dir.exists()
+except:
+    print(f"Usage: {sys.argv[0]} base_directory (root path of the repository")
+    exit(1)
 
-
-with open("./ilmn_run_ids.tsv") as f:
+with open(f"{base_dir}/analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv") as f:
     reader = csv.DictReader(f, delimiter="\t")
     for d in reader:
         runs = d["runs"].split(",")
