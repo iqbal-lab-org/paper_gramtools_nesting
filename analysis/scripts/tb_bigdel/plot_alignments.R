@@ -134,7 +134,9 @@ write_num_aligned(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 #df_long %>% filter(baseline_ref == TRUE & gramtools == FALSE & vg == TRUE)
 
 ### Minimap2 results: look at unmapped, low mapq, and gramtools high edit distance sequences ##
-#df_unfiltered_minimap2 <- as_tibble(read.csv("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/tb_bigdel/plots/df3b1583/minimap2/callsunfiltered_stats.tsv",sep="\t"))
+#df_unfiltered_minimap2 <- as_tibble(read.csv("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/tb_bigdel/plots/124321a0/minimap2/callsfilterpass_stats.tsv",sep="\t"))
+# Num sequences mapped with edit distance of 0
+#df_unfiltered_minimap2 %>% filter(NM == 0) %>% group_by(condition) %>% summarise(n())
 #df_lowmapq_minimap2 <- df_unfiltered_minimap2 %>% filter(!is.na(MAPQ) & MAPQ<=40)
 #df_mapq_minimap2 <- df_unfiltered_minimap2
 #df_mapq_minimap2$NM[df_mapq_minimap2$MAPQ < 30] <- NA

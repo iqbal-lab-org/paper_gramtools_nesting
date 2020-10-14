@@ -35,6 +35,11 @@ From: ubuntu:focal
     # R requirements of repo
     Rscript /setup_files/Rpacks.R
 
+    ## For downloading data from ENA
+    git clone https://github.com/enasequence/enaBrowserTools
+    cp -r enaBrowserTools/python3/* /usr/bin
+    rm -r enaBrowserTools
+
 	## art_ilmn (read simulation)
 	cd ${HOME}
     apt-get install -y libgsl-dev
@@ -108,7 +113,7 @@ From: ubuntu:focal
 
 	cd ${HOME}
 	git clone https://github.com/iqbal-lab-org/gramtools
-	cd gramtools && git checkout e0d5b829d135ca553e820ebf2 && mkdir build && cd build
+	cd gramtools && git checkout 124321a0bba95116589b3697dcd86f6601c3af42 && mkdir build && cd build
 	cmake .. -DCMAKE_BUILD_TYPE=REL_WITH_ASSERTS
 	make -j 4 gram encode_prg combine_jvcfs
 	cp ../libgramtools/submods/encode_prg.bin /usr/bin/encode_prg

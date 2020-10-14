@@ -1,7 +1,5 @@
 This is the repository for the gramtools nested variation paper analysis. It is divided into snakemake workflows, one folder each in analysis/workflows.
 
-They are designed to be run in a cluster environment with a singularity container containing all dependencies. 
-
 Setup
 =======
 
@@ -10,22 +8,22 @@ Requirements for setup
 
 * Python >=3.6
 * Singularity>=v3.4.0-1 
-  + if building container, root privilege (or use `fakeroot <https://sylabs.io/guides/3.5/user-guide/fakeroot.html>`_)
 
 
 Input data
 ------------
 
-Here we list all the datasets used and where their accessions are listed if they are accessioned.
+Here we list all the datasets used and where their accessions are listed (if no accession is given, the data are downloadable as part of this study).
 We provide scripts/commands to obtain all the data, see `below <Steps for setup_>`.
 
-* P. falciparum 14 Illumina reads and matched PacBio assemblies.
-  Accessions: analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
+* P. falciparum 14 Illumina read sets and matched PacBio assemblies. *Accessions*: analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
 * P. falciparum vcfs of 2,500 samples
-* P. falciparum Illumina reads of 706 samples.
-  Accessions: analysis/input_data/pfalciparum/pf3k/bam_list.txt
-* M. tuberculosis 17 Illumina reads and matched PacBio assemblies. Illumina accessions: analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv. 
+* P. falciparum 700 Illumina read sets from `Pf3k release 5
+  <ftp://ngs.sanger.ac.uk/production/pf3k/release_5/BAM/>`_
+  *Accessions*: analysis/input_data/pfalciparum/pf3k/bam_list.txt
+* M. tuberculosis 17 Illumina read sets and matched PacBio assemblies. *Illumina accessions*: analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv. 
 * M. tuberculosis vcfs of 1,017 samples
+
 
 Steps for setup
 -------------------
@@ -45,12 +43,16 @@ Obtain the singularity container::
     # Or build container directly:
     # sudo singularity build container/built/singu.sif container/singu_def.def 
 
-Obtain input data::
+Obtain the input data::
+
+    # Some data download uses enaDataGet, which is installed in container.
+    singu_command="singularity exec container/built/singu.sif"
 
     ## P. falciparum data ##
-    bash analysis/input_data/download_data/pf_dl_ilmn_ena.sh
-    bash analysis/input_data/download_data/pf_dl_pacb_assemblies.sh
-    # Below downloads >700 BAMs; recommend modifying the script to submit in parallel to a cluster
+    "$singu_command" bash analysis/input_data/download_data/pf_dl_ilmn_ena.sh
+    "$singu_command" bash analysis/input_data/download_data/pf_dl_pacb_assemblies.sh
+
+    # Below downloads >700 BAMs of >1GB each; I recommend modifying the script to submit in parallel to a cluster. Downloads from a FTP server, several reruns may be required
     bash analysis/input_data/download_data/pf_dl_ilmn_pf3k.sh
 
     pf_vcfs="analysis/input_data/pfalciparum/pf3k/vcfs"
@@ -62,7 +64,7 @@ Obtain input data::
     mkdir -p "$tb_vcfs"
     [TODO] wget zenodo.com/nesting_paper/tb_vcfs.tar.gz
 
-    python3 analysis/input_data/download_data/mtb_dl_ilmn_ena.py
+    "$singu_command" python3 analysis/input_data/download_data/mtb_dl_ilmn_ena.py
 
 
 How to run a worfklow
