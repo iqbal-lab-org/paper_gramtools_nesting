@@ -14,13 +14,12 @@ def get_one_run(run_id, outdir):
 
 
 
-def get_one_sample(sample_name, run_ids):
-    outdir = Path("ilmn_reads") / sample_name
+def get_one_sample(outdir, run_ids):
     outdir.mkdir(parents=True,exist_ok=True)
 
     exist = [Path(f"{outdir}/reads_{i}.fastq.gz").exists() for i in [1,2]]
     if False not in exist:
-        print("{outdir} already has reads, skipped")
+        print(f"{outdir} already has reads, skipped")
         return
 
     for run in run_ids:
@@ -51,9 +50,10 @@ except:
     print(f"Usage: {sys.argv[0]} base_directory (root path of the repository")
     exit(1)
 
-with open(f"{base_dir}/analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv") as f:
+with open(f"{base_dir}/analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv") as f:
     reader = csv.DictReader(f, delimiter="\t")
     for d in reader:
-        runs = d["runs"].split(",")
-        get_one_sample(d["sample"], runs)
+        runs = d["Illumina reads"].split(",")
+        outdir = Path(f"{base_dir}/analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_reads") / d["Sample name"]
+        get_one_sample(outdir, runs)
 
