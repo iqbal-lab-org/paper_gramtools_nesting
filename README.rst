@@ -1,4 +1,8 @@
-This is the repository for the gramtools nested variation paper analysis. It is divided into snakemake workflows, one folder each in analysis/workflows.
+Intro
+======
+This is the repository for the paper *Enabling multiscale variation analysis with genome graphs*. 
+
+It is divided into snakemake workflows, one folder each in analysis/workflows.
 
 Setup
 =======

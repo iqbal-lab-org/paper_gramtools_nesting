@@ -40,6 +40,12 @@ From: ubuntu:focal
     cp -r enaBrowserTools/python3/* /usr/bin
     rm -r enaBrowserTools
 
+    ## seqtk (fasta/q manipulation)
+    cd ${HOME}
+    git clone https://github.com/lh3/seqtk
+    cd seqtk && make
+    cp seqtk /usr/bin && cd .. && rm -r seqtk
+
 	## art_ilmn (read simulation)
 	cd ${HOME}
     apt-get install -y libgsl-dev
