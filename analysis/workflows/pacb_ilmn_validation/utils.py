@@ -15,20 +15,6 @@ def get_assembly(wildcards):
     return assembly
 
 
-def get_reads(wildcards) -> List[str]:
-    reads_dir = f'{config["ilmn_reads_dir"]}/{wildcards.sample}'
-    reads_files = glob(f"{reads_dir}/**/*.fastq.gz")
-    reads_files += glob(f"{reads_dir}/*.fastq.gz")
-    if len(reads_files) == 0:
-        raise FileNotFoundError(f"No reads files found in {reads_dir}")
-    for read_file in reads_files:
-        if " " in read_file:
-            raise ValueError(
-                f"file {read_file} has whitespace in it, this breaks the pipeline. rename the file or change the separator in the pipeline at {sys.argv[0]}"
-            )
-    return reads_files
-
-
 def get_samples(
     sample_tsv: str, excluded: Set[str] = set(), included: Set[str] = set()
 ):

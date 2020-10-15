@@ -17,7 +17,6 @@ IFS=$'\n'
 for line in $(cat ${samp_accessions})
 do
 	if [[ ${line:0:1} == '#' ]] || [[ ${line:0:6} == 'sample' ]] ; then continue; fi
-	echo $line
 	IFS=$'\t'; elems=($line)
 	ilmn_read_accession="${elems[2]}"
 	samp_name="${elems[0]}"

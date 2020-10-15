@@ -1,6 +1,5 @@
-pf3k:
-    bams_filelist: "analysis/input_data/pfalciparum/pf3k/bam_list.txt"
-    bams_basedir: "analysis/input_data/pfalciparum/pf3k/bams"
+sample_tsv: "analysis/input_data/pfalciparum/pf3k/pf3k_release_5.txt"
+ilmn_reads_dir: "analysis/input_data/pfalciparum/pf3k/fastqs" # Must be named this way, is referred to in analysis/workflows/common_utils.py
 
 prg: "analysis/outputs/make_prgs/pf_4surfants/prg_mn5_mml7" # Implies make_prgs workflow has been run on the pf_4surfants gene list
 gene_list_name: "pf_4surfants"

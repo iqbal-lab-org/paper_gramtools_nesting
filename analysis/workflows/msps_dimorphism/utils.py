@@ -1,12 +1,20 @@
 from typing import List
 
-def get_bams(filelist_path: str) -> List[str]:
-    res = list()
-    with open(filelist_path) as fin:
+def get_samples(sample_tsv: str) -> List[str]:
+    samples = []
+    with open(sample_tsv) as fin:
         for line in fin:
-            assert(line.rstrip().endswith(".bam"))
-            res.append(line.rstrip().replace(".bam",""))
-    return res
+            tabs = line.split("\t")
+            if len(tabs) < 3:
+                continue
+            to_process = tabs[2]
+            if to_process == "1":
+                samples.append(tabs[0])
+    return samples
+
+
+
+
 
 def get_tree_genes(bed_path: str) -> List[str]:
     res = list()

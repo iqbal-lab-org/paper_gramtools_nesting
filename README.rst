@@ -45,15 +45,15 @@ Obtain the singularity container::
 
 Obtain the input data::
 
-    # Some data download uses enaDataGet, which is installed in container.
+    # Some data download uses enaBrowserTools and seqtk, which are installed in container.
     singu_command="singularity exec container/built/singu.sif"
 
     ## P. falciparum data ##
     "$singu_command" bash analysis/input_data/download_data/pf_dl_ilmn_ena.sh
     "$singu_command" bash analysis/input_data/download_data/pf_dl_pacb_assemblies.sh
 
-    # Below downloads >700 BAMs of >1GB each; I recommend modifying the script to submit in parallel to a cluster. Downloads from a FTP server, several reruns may be required
-    bash analysis/input_data/download_data/pf_dl_ilmn_pf3k.sh
+    # Below downloads >700 fastqs of ~1GB each; I recommend modifying the script to submit in parallel to a cluster (adding in singularity command too). Downloads from a FTP server, several reruns may be required
+    bash analysis/input_data/download_data/pf3k_dl_ilmn_all.sh
 
     pf_vcfs="analysis/input_data/pfalciparum/pf3k/vcfs"
     mkdir -p "$pf_vcfs"

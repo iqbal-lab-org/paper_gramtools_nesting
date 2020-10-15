@@ -14,6 +14,7 @@ __pycache__
 # Inputs
 analysis/input_data/pfalciparum/pf3k/vcfs
 analysis/input_data/pfalciparum/pf3k/bams
+analysis/input_data/pfalciparum/pf3k/fastqs
 analysis/input_data/pfalciparum/pacb_ilmn/ilmn_reads
 analysis/input_data/pfalciparum/pacb_ilmn/pacb_assemblies
 analysis/input_data/mtuberculosis/clockwork/vcfs
