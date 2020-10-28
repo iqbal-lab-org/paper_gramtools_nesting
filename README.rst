@@ -20,12 +20,11 @@ Input data
 Here we list all the datasets used and where their accessions are listed (if no accession is given, the data are downloadable as part of this study).
 We provide scripts/commands to obtain all the data, see `below <Steps for setup_>`.
 
-* P. falciparum 14 Illumina read sets and matched PacBio assemblies. *Accessions*: analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
+* P. falciparum 14 Illumina read sets and matched PacBio assemblies. **Accessions**: analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
 * P. falciparum vcfs of 2,500 samples
-* P. falciparum 700 Illumina read sets from `Pf3k release 5
-  <ftp://ngs.sanger.ac.uk/production/pf3k/release_5/BAM/>`_
-  *Accessions*: analysis/input_data/pfalciparum/pf3k/bam_list.txt
-* M. tuberculosis 17 Illumina read sets and matched PacBio assemblies. *Illumina accessions*: analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_run_ids.tsv. 
+* P. falciparum 700 Illumina read sets from Pf3k release 5.
+  **Accessions**: analysis/input_data/pfalciparum/pf3k/pf3k_release_5.tsv
+* M. tuberculosis 17 Illumina read sets and matched PacBio assemblies. **Accessions**: analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv. 
 * M. tuberculosis vcfs of 1,017 samples
 
 

@@ -4,7 +4,7 @@ set -eu
 
 base_dir=$(realpath $1)
 
-samp_accessions="${base_dir}/analysis/input_data/pfalciparum/pf3k/pf3k_release_5.txt"
+samp_accessions="${base_dir}/analysis/input_data/pfalciparum/pf3k/pf3k_release_5.tsv"
 reads_dir="${base_dir}/analysis/input_data/pfalciparum/pf3k/fastqs"
 
 #pf3k_ftp="ftp://ngs.sanger.ac.uk/production/pf3k/release_5/BAM/"
