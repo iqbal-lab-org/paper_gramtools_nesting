@@ -20,6 +20,7 @@ analysis/input_data/pfalciparum/pacb_ilmn/pacb_assemblies
 analysis/input_data/mtuberculosis/clockwork/vcfs
 analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_reads
 analysis/input_data/mtuberculosis/pacb_ilmn/pacb_assemblies
+zenodo_data
 
 # Results
 analysis/outputs
