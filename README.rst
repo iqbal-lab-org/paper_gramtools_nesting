@@ -11,21 +11,28 @@ Requirements for setup
 --------------------------
 
 * Python >=3.6
-* Singularity>=v3.4.0-1 
+* `Singularity>=v3.4.0-1 <https://sylabs.io/guides/3.5/user-guide/>`_
 
 
 Input data
 ------------
 
-Here we list all the datasets used and where their accessions are listed (if no accession is given, the data are downloadable as part of this study).
-We provide scripts/commands to obtain all the data, see `below <Steps for setup_>`.
+Here we list all the datasets used; for each, either files listing public repository accessions 
+are listed or the filename released on Zenodo is provided.
+We provide scripts and commands to obtain all the data, see `below <Steps for setup>`_.
 
-* P. falciparum 14 Illumina read sets and matched PacBio assemblies. **Accessions**: analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
-* P. falciparum vcfs of 2,500 samples
-* P. falciparum 700 Illumina read sets from Pf3k release 5.
+1. M. tuberculosis vcfs of 1,017 samples
+   **Accessions**: Zenodo
+1. P. falciparum vcfs of 2,498 samples
+   **Accessions**: Zenodo
+1. M. tuberculosis validation PacBio assemblies of 17 samples
+   **Accessions**: Zenodo
+1. M. tuberculosis validation Illumina read sets of 17 samples
+   **Accessions**: analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv. 
+1. P. falciparum 14 Illumina read sets and matched PacBio assemblies. 
+  **Accessions**: analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
+1. P. falciparum 700 Illumina read sets from Pf3k release 5.
   **Accessions**: analysis/input_data/pfalciparum/pf3k/pf3k_release_5.tsv
-* M. tuberculosis 17 Illumina read sets and matched PacBio assemblies. **Accessions**: analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv. 
-* M. tuberculosis vcfs of 1,017 samples
 
 
 Steps for setup
@@ -43,7 +50,7 @@ Obtain the singularity container::
 
     # Download container:
     TODO
-    # Or build container directly:
+    # Or build container directly; this should take ~30 minutes
     # sudo singularity build container/built/singu.sif container/singu_def.def 
 
 Obtain the input data::
@@ -55,7 +62,7 @@ Obtain the input data::
     "$singu_command" bash analysis/input_data/download_data/pf_dl_ilmn_ena.sh
     "$singu_command" bash analysis/input_data/download_data/pf_dl_pacb_assemblies.sh
 
-    # Below downloads >700 fastqs of ~1GB each; I recommend modifying the script to submit in parallel to a cluster (adding in singularity command too). Downloads from a FTP server, several reruns may be required
+    # Below downloads >700 fastqs of ~1GB each; I recommend modifying the script to submit in parallel to a cluster (adding in singularity command too). Downloads from ENA server, several reruns may be required if server throws any error.
     bash analysis/input_data/download_data/pf3k_dl_ilmn_all.sh
 
     pf_vcfs="analysis/input_data/pfalciparum/pf3k/vcfs"
@@ -74,13 +81,19 @@ How to run a worfklow
 ----------------------
 ::
 
-    . venv/bin/activate
-    TODO: Below is ebi cluster + lsf-specific
-    module load singularity/3.5.0
-    bash analysis/cluster_submit.sh <workflow_name>
+      . venv/bin/activate
+      WORKFLOW=<workflow_name>
+      snakemake -s analysis/workflows/"${WORKFLOW}"/Snakefile --use-singularity --verbose
 
-* Requires lsf profile for snakemake: https://github.com/Snakemake-Profiles/snakemake-lsf. 
-    The non-defaults configs are: LSF_UNIT_FOR_LIMITS=MB, default_cluster_logdir=run/logs/lsf_profile
+We have run the analyses on an LSF Cluster, executing the following:
+* Install the snakemake lsf profile https://github.com/Snakemake-Profiles/snakemake-lsf;
+  the non-defaults configs are: LSF_UNIT_FOR_LIMITS=MB, default_cluster_logdir=analysis/logs/lsf_profile
+* Run submission script::
+
+        . venv/bin/activate
+        bash analysis/cluster_submit.sh <workflow_name>
+
+The submission script contains specific filepaths on our cluster, which you should modify.
 
 
 Order to run workflows in
