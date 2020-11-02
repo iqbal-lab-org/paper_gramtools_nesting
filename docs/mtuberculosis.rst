@@ -4,11 +4,11 @@ analysis prerequisites
 TB Comas data
 --------------
 
-This is ilmn reads and pacb assemblies of 17 samples. The public accessions are listed in analysis/input_data/mtuberculosis/Comas
+This is ilmn reads and pacb assemblies of 17 samples. The public accessions are listed in analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv
+
+--> Martin assembled the PACB reads, see paper.
 
 Clockwork vcfs from ilmn reads against H37Rv reference are also listed in same directory. These are used to produce the initial set of deletion regions to construct prgs in.
-
-NOTE: assemblies deemed improvable by martin: for eg, N1202 is missing the region approximately 899000 - 974500 from his analyses.
 
 TB clockwork vcfs
 ------------------

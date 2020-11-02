@@ -17,22 +17,21 @@ Requirements for setup
 Input data
 ------------
 
-Here we list all the datasets used; for each, either files listing public repository accessions 
-are listed or the filename released on Zenodo is provided.
+Here we list all the datasets used; for each, either public accessions are stored in a file or the data is available for download on Zenodo. 
 We provide scripts and commands to obtain all the data, see `below <Steps for setup>`_.
 
 1. M. tuberculosis vcfs of 1,017 samples
-   **Accessions**: Zenodo
+   **Access**: Download on Zenodo
 1. P. falciparum vcfs of 2,498 samples
-   **Accessions**: Zenodo
+   **Access**: Download on Zenodo
 1. M. tuberculosis validation PacBio assemblies of 17 samples
-   **Accessions**: Zenodo
+   **Access**: Downlod on Zenodo
 1. M. tuberculosis validation Illumina read sets of 17 samples
-   **Accessions**: analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv. 
+   **Access**: ENA accessions listed in analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv. 
 1. P. falciparum 14 Illumina read sets and matched PacBio assemblies. 
-  **Accessions**: analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
-1. P. falciparum 700 Illumina read sets from Pf3k release 5.
-  **Accessions**: analysis/input_data/pfalciparum/pf3k/pf3k_release_5.tsv
+  **Access**: ENA accessions listed in analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv
+1. P. falciparum 706 Illumina read sets from Pf3k release 5.
+  **Access**: ENA accessions listed in analysis/input_data/pfalciparum/pf3k/pf3k_release_5.tsv
 
 
 Steps for setup
@@ -50,7 +49,7 @@ Obtain the singularity container::
 
     # Download container:
     TODO
-    # Or build container directly; this should take ~30 minutes
+    # It is possible to build the container directly; this should take ~30 minutes:
     # sudo singularity build container/built/singu.sif container/singu_def.def 
 
 Obtain the input data::
@@ -62,7 +61,7 @@ Obtain the input data::
     "$singu_command" bash analysis/input_data/download_data/pf_dl_ilmn_ena.sh
     "$singu_command" bash analysis/input_data/download_data/pf_dl_pacb_assemblies.sh
 
-    # Below downloads >700 fastqs of ~1GB each; I recommend modifying the script to submit in parallel to a cluster (adding in singularity command too). Downloads from ENA server, several reruns may be required if server throws any error.
+    # Below downloads 706 fastqs of ~1GB each; I recommend modifying the script to submit in parallel to a cluster (adding in singularity command too). Downloads from ENA server, several reruns may be required if server throws any error.
     bash analysis/input_data/download_data/pf3k_dl_ilmn_all.sh
 
     pf_vcfs="analysis/input_data/pfalciparum/pf3k/vcfs"
@@ -77,7 +76,7 @@ Obtain the input data::
     "$singu_command" python3 analysis/input_data/download_data/mtb_dl_ilmn_ena.py
 
 
-How to run a worfklow
+How to run a workflow
 ----------------------
 ::
 

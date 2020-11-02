@@ -31,12 +31,11 @@ for vcf in $(cat $clockwork_vcf_list); do
     fname=${indexed_vcf_dir}/s${i}.vcf
     gzipped_fname="${fname}.gz"
     if [[ ! -e "$gzipped_fname" ]]; then
-        echo $gzipped_fname
-        exit 0
         cp $vcf $fname
         bgzip $fname
         bcftools index $gzipped_fname
     fi
+    recorded_fname=$(basename $gzipped_fname)
     echo $gzipped_fname >> $indexed_vcf_list
 done
 

@@ -7,7 +7,7 @@ genome_fai: "analysis/input_data/mtuberculosis/ref_genome/H37Rv.fasta.fai"
 initial_bed: "analysis/input_data/make_prgs/beds/tb_bigdel.bed" # made from script analysis/input_data/scripts/make_prgs/bigdel_vcfs_to_bed.sh
 
 vcf_list: "analysis/input_data/mtuberculosis/clockwork/vcf_list.txt"
-vcf_prefix: ""
+vcf_prefix: "analysis/input_data/mtuberculosis/clockwork/vcfs"
 
 make_prg:
         max_nest: [5]
