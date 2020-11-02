@@ -27,7 +27,7 @@ indexed_vcf_list="${base_dir}/intermediate_file_lists/indexed_vcf_list.txt"
 i=0
 for vcf in $(cat $clockwork_vcf_list); do
     i=$((i + 1))
-    #if [[ $i -ge 1001 ]];then break; fi
+    if [[ $i -gt $num_vcfs ]];then break; fi
     fname=${indexed_vcf_dir}/s${i}.vcf
     gzipped_fname="${fname}.gz"
     if [[ ! -e "$gzipped_fname" ]]; then
@@ -36,10 +36,10 @@ for vcf in $(cat $clockwork_vcf_list); do
         bcftools index $gzipped_fname
     fi
     recorded_fname=$(basename $gzipped_fname)
-    echo $gzipped_fname >> $indexed_vcf_list
+    echo $recorded_fname >> $indexed_vcf_list
 done
 
 
-cat <(head -n $num_vcfs $indexed_vcf_list) intermediate_file_lists/vcfs_Comas_pacb_ilmn.txt > "vcf_list.txt"
+cat <(head -n $num_vcfs $indexed_vcf_list) ${base_dir}/intermediate_file_lists/vcfs_Comas_pacb_ilmn.txt > "${base_dir}/vcf_list.txt"
 
 
