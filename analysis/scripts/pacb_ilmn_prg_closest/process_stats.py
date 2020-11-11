@@ -5,6 +5,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+sns.set_context("paper")
 
 def usage():
     print(
@@ -55,7 +56,7 @@ if __name__ == "__main__":
 
         diff_df = pd.DataFrame(diff_df_rows)
         for gene in set(diff_df["gene"]):
-            plt.figure(figsize=(9.5, 12))
+            plt.figure(figsize=(10, 12))
             filtered = diff_df[diff_df["gene"] == gene]
             ax = sns.boxplot(
                 data=filtered,
@@ -64,7 +65,7 @@ if __name__ == "__main__":
                 whis=10000000,
             )
             ax = sns.swarmplot(data=filtered, y=f"delta_NM", color=".2")
-            ax.set(ylabel="delta edit distance")
+            ax.set(ylabel="scaled edit distance difference (gramtools vs closest input)")
             ax.figure.savefig(str(output_dir / f"{gene}_gmtools_delta_{used_name}.pdf"))
             ax = None
         diff_df.to_csv(str(output_dir / f"diff_NM_{used_name}"), sep="\t")

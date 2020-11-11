@@ -1,4 +1,4 @@
-sample_tsv: "analysis/input_data/pfalciparum/pf3k/pf3k_release_5.txt"
+sample_tsv: "analysis/input_data/pfalciparum/pf3k/pf3k_release_5.tsv"
 ilmn_reads_dir: "analysis/input_data/pfalciparum/pf3k/fastqs" # Must be named this way, is referred to in analysis/workflows/common_utils.py
 
 prg: "analysis/outputs/make_prgs/pf_4surfants/prg_mn5_mml7" # Implies make_prgs workflow has been run on the pf_4surfants gene list

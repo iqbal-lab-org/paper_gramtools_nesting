@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+sns.set_context("paper")
 
 def usage():
     print(
@@ -25,12 +26,14 @@ def get_NMs(condition):
 
 
 def convert_names(df: pd.DataFrame) -> pd.DataFrame:
+    gramtools_condition = [elem for elem in set(df["condition"]) if elem.startswith("gramtools")][0]
     conversion_table = {
         "baseline_ref": "3D7",
         "cortex_baseline_ref": "cortex(3D7)",
         "samtools_baseline_ref": "samtools(3D7)",
         "cortex_pers_ref": "cortex(PR)",
         "samtools_pers_ref": "samtools(PR)",
+        gramtools_condition: "gramtools",
     }
     for match, replacement in conversion_table.items():
         df = df.replace(match, replacement)
@@ -41,7 +44,7 @@ def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path)
     mean_metric = stats_data.groupby(["condition"])[metric].mean()
     condition_order = list(mean_metric.sort_values(ascending=False).index)
     for gene in set(stats_data["gene"]):
-        plt.figure(figsize=(13.5, 10))
+        plt.figure(figsize=(14.5, 10))
         filtered = stats_data[stats_data["gene"] == gene]
         ax = sns.boxplot(
             data=filtered,
@@ -54,9 +57,9 @@ def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path)
         ax = sns.swarmplot(
             data=filtered, x="condition", y=metric, color=".2", order=condition_order
         )
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=15)
+        #ax.set_xticklabels(ax.get_xticklabels(), rotation=15)
         if metric == "NM":
-            ax.set(ylabel="edit distance")
+            ax.set(ylabel="scaled edit distance")
         ax.figure.savefig(str(output_dir / f"{metric}_{gene}.pdf"))
         ax = None
     # If want to plot both box and swarmplot in facetgrid, use below, but this makes the data points and axes too small
