@@ -8,6 +8,8 @@ library(purrr)
 library(argparser, quietly=TRUE)
 library(rjson)
 
+options(pillar.sigfig=4)
+
 p <- arg_parser("Plot genotyping performance")
 p <- add_argument(p, "input_tsv", help="")
 p <- add_argument(p, "output_dir", help="")
@@ -51,7 +53,7 @@ plot_prec_recall <- function(data, title, argv, prg_name, gmtools_commit, facete
   avg_precision = get_precision(data$classif)
   #plot_title <- sprintf("dataset: %s, gramtools_commit: %s", prg_name, gmtools_commit)
   plot_title <- ""
-  plot_subtitle <-sprintf("average recall=%.3f average precision=%.3f", avg_recall,avg_precision)
+  plot_subtitle <-sprintf("average recall=%.4f average precision=%.4f", avg_recall,avg_precision)
   
   prec_recall <- ggplot(total, aes(metric,score)) + geom_bar(aes(fill=nesting), stat="identity",position="dodge") + 
     labs(title = plot_title, subtitle=plot_subtitle)

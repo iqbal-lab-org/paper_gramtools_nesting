@@ -28,7 +28,7 @@ get_metric(){
 }
 
 get_RAM(){
-    metric="Average Memory"
+    metric="Max Memory"
     subdir1=$1
     RAM1=$(get_metric "$metric" "$subdir1")
     printf -v RAM1 %.0f "$RAM1"
@@ -76,7 +76,7 @@ mean_CPU_build_gramtools=$(get_metric "CPU time" "tb_gram_build")
 mean_RAM_build_vg=$(get_RAM "tb_vg_build")
 mean_CPU_build_vg=$(get_metric "CPU time" "tb_vg_build")
 
-echo -e "Tool\tOperation\tAverage RAM\tSpeed(reads/CPU sec or CPU sec)" > $ofile
+echo -e "Tool\tOperation\tMax RAM\tSpeed(reads/CPU sec or CPU sec)" > $ofile
 echo -e "vg\tindex\t$mean_RAM_build_vg\t$mean_CPU_build_vg" >> $ofile
 echo -e "gramtools\tindex\t$mean_RAM_build_gramtools\t$mean_CPU_build_gramtools" >> $ofile
 echo -e "vg\tgenotype\t$mean_RAM_vg\t$mean_CPU_vg" >> $ofile

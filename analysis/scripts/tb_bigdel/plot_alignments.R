@@ -20,7 +20,7 @@ plot_ecdf <- function(dataset, output_dir, commit, name, with_unmapped = FALSE){
     plotted_dataset = dataset
   }
   
-  ecdf_plot <- ggplot(plotted_dataset, aes(x = NM, colour = condition)) + stat_ecdf(geom="step", 
+  ecdf_plot <- ggplot(plotted_dataset, aes(x = NM, colour = tool)) + stat_ecdf(geom="step", 
                                                                                     pad = FALSE) + 
     ylab("fraction of sequences") + xlab("edit distance") + 
     theme(text=element_text(size = 13))
@@ -29,8 +29,8 @@ plot_ecdf <- function(dataset, output_dir, commit, name, with_unmapped = FALSE){
 }
 
 write_mean_eddist <- function(dataset, output_dir, commit, name){
-# Write mean edit distance of aligned sequences by condition
-  mean_eddist <- dataset %>% group_by(condition) %>% summarise(dist=mean(NM,na.rm=TRUE))
+# Write mean edit distance of aligned sequences by tool
+  mean_eddist <- dataset %>% group_by(tool) %>% summarise(dist=mean(NM,na.rm=TRUE))
   fname <- sprintf("mean_eddist_%s_%s.txt", commit, name)
   write_tsv(mean_eddist, file.path(output_dir, fname))
 }
@@ -40,14 +40,14 @@ plot_upset <- function(dataset, output_dir, commit, name, plot_missing = FALSE){
   if (plot_missing){
     plotted_dataset <- dataset %>%
       mutate(missing = as.numeric(is.na(NM))) %>%
-      select(sample, gene, condition, missing) %>%
-      spread(condition, missing)
+      select(sample, gene, tool, missing) %>%
+      spread(tool, missing)
   }
   else{
   plotted_dataset <- dataset %>%
     mutate(found = as.numeric(!is.na(NM))) %>%
-    select(sample, gene, condition, found) %>%
-    spread(condition, found)
+    select(sample, gene, tool, found) %>%
+    spread(tool, found)
   }
   
   fname <- sprintf("upset_plot_%s_%s.pdf", commit, name)
@@ -58,9 +58,9 @@ plot_upset <- function(dataset, output_dir, commit, name, plot_missing = FALSE){
 }
 
 write_num_aligned <- function(dataset, output_dir, commit, name){
-# Write number of aligned sequences by condition
+# Write number of aligned sequences by tool
   num_aligned <- dataset %>% filter(!is.na(NM)) %>% 
-    group_by(condition) %>% summarise(n())
+    group_by(tool) %>% summarise(n())
   fname <- sprintf("num_aligned_%s_%s.txt", commit, name)
   write_tsv(num_aligned, file.path(output_dir, fname))
 }
@@ -73,12 +73,13 @@ dir.create(outdir)
 
 #df_unfiltered <- as_tibble(read.csv("/tmp/stats.tsv", sep="\t"))
 df_unfiltered <- as_tibble(read.csv(argv$input_tsv, sep="\t"))
+df_unfiltered <- df_unfiltered %>% rename(tool = condition)
 
 # Remove commit from gramtools condition name
-conditions = as.character(unique(df_unfiltered$condition))
-gram_cond = conditions[grep("gramtools_*", conditions)]
-df_unfiltered$condition = replace(as.vector(df_unfiltered$condition), df_unfiltered$condition == gram_cond, "gramtools")
-df_unfiltered$condition = replace(as.vector(df_unfiltered$condition), df_unfiltered$condition == "baseline_ref", "baseline(H37Rv)")
+tools = as.character(unique(df_unfiltered$tool))
+gram_cond = tools[grep("gramtools_*", tools)]
+df_unfiltered$tool = replace(as.vector(df_unfiltered$tool), df_unfiltered$tool == gram_cond, "gramtools")
+df_unfiltered$tool = replace(as.vector(df_unfiltered$tool), df_unfiltered$tool == "baseline_ref", "baseline(H37Rv)")
 
 # Convert alignment NM below MAPQ threshold to NA
 df_mapq30 <- df_unfiltered
@@ -121,7 +122,7 @@ write_num_aligned(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 
 ## Using ggupset package, interfaces with ggplot
 #library(ggupset)
-#df_long <- df %>% mutate(found = !is.na(NM)) %>% select(sample, gene, condition, found) %>% spread(condition, found)
+#df_long <- df %>% mutate(found = !is.na(NM)) %>% select(sample, gene, tool, found) %>% spread(tool, found)
 #df_upset <- df_long %>% mutate(elem=paste(sample,gene,sep="_")) %>% select(-sample, -gene) %>%
 #  gather(Condition, Member, -elem)  %>% filter(Member) %>% select(-Member)
 #df_upset <- df_upset %>% group_by(elem) %>% summarise(Sequences=list(Condition))
@@ -136,26 +137,26 @@ write_num_aligned(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 ### Minimap2 results: look at unmapped, low mapq, and gramtools high edit distance sequences ##
 #df_unfiltered_minimap2 <- as_tibble(read.csv("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/tb_bigdel/plots/124321a0/minimap2/callsfilterpass_stats.tsv",sep="\t"))
 # Num sequences mapped with edit distance of 0
-#df_unfiltered_minimap2 %>% filter(NM == 0) %>% group_by(condition) %>% summarise(n())
+#df_unfiltered_minimap2 %>% filter(NM == 0) %>% group_by(tool) %>% summarise(n())
 #df_lowmapq_minimap2 <- df_unfiltered_minimap2 %>% filter(!is.na(MAPQ) & MAPQ<=40)
 #df_mapq_minimap2 <- df_unfiltered_minimap2
 #df_mapq_minimap2$NM[df_mapq_minimap2$MAPQ < 30] <- NA
 #max_NM <- max(df_mapq_minimap2$NM, na.rm = TRUE)
 #plotted_dataset <-df_mapq_minimap2 %>% replace_na(list(NM = max_NM))
-#ecdf_plot <- ggplot(plotted_dataset, aes(x = NM, colour = condition)) + stat_ecdf(geom="step", pad = FALSE)
-#df_mapq_minimap2 %>% group_by(condition) %>% summarise(dist=mean(NM,na.rm=TRUE))
+#ecdf_plot <- ggplot(plotted_dataset, aes(x = NM, colour = tool)) + stat_ecdf(geom="step", pad = FALSE)
+#df_mapq_minimap2 %>% group_by(tool) %>% summarise(dist=mean(NM,na.rm=TRUE))
 #long_missing_minimap2 <- df_mapq_minimap2 %>%
 #  mutate(missing = as.numeric(is.na(NM))) %>%
-#  select(sample, gene, condition, missing) %>%
-#  spread(condition, missing)
+#  select(sample, gene, tool, missing) %>%
+#  spread(tool, missing)
 #
 #all_NAs_minimap2 <- df_mapq_minimap2 %>% filter(is.na(NM))
 #gramtools_unmapped_minimap2 <- long_missing_minimap2 %>% filter(gramtools_df3b1583 == 1)
 #graphtyper_unmapped_minimap2 <- long_missing_minimap2 %>% filter(graphtyper2 == 1)
 #
 #long_NM_minimap2 <- df_mapq_minimap2 %>%
-#  select(sample, gene, condition, NM) %>%
-#  spread(condition, NM)
+#  select(sample, gene, tool, NM) %>%
+#  spread(tool, NM)
 #
 #long_NM_minimap2 <- long_NM_minimap2 %>% mutate(gramtools_diff=gramtools_df3b1583 - graphtyper2)
 #worse_than_gtyper2 <- long_NM_minimap2 %>% filter(gramtools_diff > 0)

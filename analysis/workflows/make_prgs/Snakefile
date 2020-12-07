@@ -165,7 +165,7 @@ rule make_var_prgs:
         """
         mkdir -p {params.outdir}
         matched_out={params.outdir}/{wildcards.gene}.max_nest{wildcards.max_nest}.min_match{wildcards.min_match}.bin
-        make_prg prg_from_msa {input} -p {params.outdir}/{wildcards.gene} --max_nesting {wildcards.max_nest} --min_match_length {wildcards.min_match}
+        make_prg from_msa {input} -p {params.outdir}/{wildcards.gene} --max_nesting {wildcards.max_nest} --min_match_length {wildcards.min_match}
         mv $matched_out {output.simple_out}
         #pref=${{matched_out%.*}}
         #rm ${{pref}}*
