@@ -37,6 +37,7 @@ def mk_output_dirs(variables):
     for variable in filter(lambda name: name.startswith("output"), variables):
         Path(eval(variable)).mkdir(exist_ok=True, parents=True)
 
+
 def get_reads(wildcards) -> List[str]:
     reads_dir = f'{config["ilmn_reads_dir"]}/{wildcards.sample}'
     reads_files = glob(f"{reads_dir}/**/**/*.fastq.gz")

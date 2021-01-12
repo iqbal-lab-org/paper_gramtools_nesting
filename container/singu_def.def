@@ -103,7 +103,7 @@ From: ubuntu:focal
 	## make_prg (genome graph construction)
 	cd ${HOME}
 	git clone https://github.com/rmcolq/make_prg.git
-	cd make_prg && git checkout bcd7f7dba42aa29d5fe6a75f9e1c9abd129ae62b
+	cd make_prg && git checkout 2d7557a0724b4e6e9c3328ac3381318a5b994144
 	pip3 install . && cd .. && rm -r make_prg
 
 

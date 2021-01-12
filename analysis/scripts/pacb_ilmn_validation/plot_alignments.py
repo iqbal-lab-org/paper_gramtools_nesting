@@ -6,12 +6,9 @@ from pathlib import Path
 
 sns.set_context("paper")
 
+
 def usage():
-    print(
-        f"usage: {sys.argv[0]} stats_file output_dir\n"
-        "The input_dir should contain the .sam files to analyse.\n"
-        "The input_bed should contain the read names in column 4."
-    )
+    print(f"usage: {sys.argv[0]} stats_file output_dir\n")
     exit(1)
 
 
@@ -26,7 +23,9 @@ def get_NMs(condition):
 
 
 def convert_names(df: pd.DataFrame) -> pd.DataFrame:
-    gramtools_condition = [elem for elem in set(df["condition"]) if elem.startswith("gramtools")][0]
+    gramtools_condition = [
+        elem for elem in set(df["condition"]) if elem.startswith("gramtools")
+    ][0]
     conversion_table = {
         "baseline_ref": "3D7",
         "cortex_baseline_ref": "cortex(3D7)",
@@ -57,10 +56,11 @@ def make_condition_plot(stats_data: pd.DataFrame, metric: str, output_dir: Path)
         ax = sns.swarmplot(
             data=filtered, x="condition", y=metric, color=".2", order=condition_order
         )
-        #ax.set_xticklabels(ax.get_xticklabels(), rotation=15)
+        plt.xlabel("")
+        # ax.set_xticklabels(ax.get_xticklabels(), rotation=15)
         if metric == "NM":
             ax.set(ylabel="scaled edit distance")
-        ax.figure.savefig(str(output_dir / f"{metric}_{gene}.pdf"))
+        ax.figure.savefig(str(output_dir / f"py_{metric}_{gene}.pdf"))
         ax = None
     # If want to plot both box and swarmplot in facetgrid, use below, but this makes the data points and axes too small
     # plot = sns.FacetGrid(stats_data, col="gene", height=6, aspect=1)

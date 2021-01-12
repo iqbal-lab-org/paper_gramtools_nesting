@@ -66,7 +66,7 @@ SAMPLES = get_samples(config["sample_tsv"], excluded)
 rule all:
     input:
         f"{output_plots}/stats.tsv",
-        expand(f"{output_plots}/NM_{{gene}}.pdf", gene=GENES),
+        expand(f"{output_plots}/{{prog}}_NM_{{gene}}.pdf", gene=GENES, prog=["py","R"]),
 
 
 rule validation_index_pacb_assemblies:
@@ -302,9 +302,10 @@ rule validation_process_and_plot_alignments:
         var_regions=config["initial_bed"],
     output:
         stats=f"{output_plots}/stats.tsv",
-        plots=expand(f"{output_plots}/NM_{{gene}}.pdf", gene=GENES),
+        plots=expand(f"{output_plots}/{{prog}}_NM_{{gene}}.pdf", gene=GENES, prog=["py","R"]),
     params:
         script_dir=f'{config["scripts"]}/{WORKFLOW}',
     shell:
         f"python3 {{params.script_dir}}/process_alignments.py {output_alignments} {{input.var_regions}} {{output.stats}};"
         f"python3 {{params.script_dir}}/plot_alignments.py {{output.stats}} {output_plots};"
+        f"Rscript {{params.script_dir}}/plot_alignments.R {{output.stats}} {output_plots} {GMTOOLS_COMMIT};"
