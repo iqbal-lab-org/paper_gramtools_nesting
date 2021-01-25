@@ -108,18 +108,21 @@ From: ubuntu:focal
 
 
 
-	/*************/
-	/* gramtools */
-	/*************/
+	#/*************/
+	#/* gramtools */
+	#/*************/
 	# cortex install. requires py2.7 and python API from source
 	apt-get install -y python python-dev
     git clone https://github.com/iqbal-lab-org/py-cortex-api
-    cd py-cortex-api && python3 setup.py install && cd .. && rm -r py-cortex-api
+    cd py-cortex-api && git checkout c94adc29ebd4f5e82640f9e8ff008349eec2d8cb && python3 setup.py install && cd .. && rm -r py-cortex-api
     
 
 	cd ${HOME}
 	git clone https://github.com/iqbal-lab-org/gramtools
-	cd gramtools && git checkout 124321a0bba95116589b3697dcd86f6601c3af42 && mkdir build && cd build
+	cd gramtools 
+    git checkout 124321a0bba95116589b3697dcd86f6601c3af42 
+    mkdir build 
+    cd build
 	cmake .. -DCMAKE_BUILD_TYPE=REL_WITH_ASSERTS
 	make -j 4 gram encode_prg combine_jvcfs
 	cp ../libgramtools/submods/encode_prg.bin /usr/bin/encode_prg
