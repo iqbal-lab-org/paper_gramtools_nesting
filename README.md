@@ -68,15 +68,17 @@ Obtain the input data:
 
     pf_vcfs="analysis/input_data/pfalciparum/pf3k/vcfs"
     mkdir -p "$pf_vcfs"
-    wget https://zenodo.org/record/4147302/files/3_pf_vcfs.tar?download=1 
+    wget https://zenodo.org/record/4147302/files/3_pf_vcfs.tar?download=1  -O 3_pf_vcfs.tar
     tar -xf 3_pf_vcfs.tar
 
     ## M. tuberculosis data ##
     tb_vcfs="analysis/input_data/mtuberculosis/clockwork/vcfs"
     mkdir -p "$tb_vcfs"
     
-    wget https://zenodo.org/record/4147302/files/2_mtb_vcfs.tar?download=1
+    wget https://zenodo.org/record/4147302/files/2_mtb_vcfs.tar?download=1 -O 2_mtb_vcfs.tar
     tar -xf 2_mtb_vcfs.tar
+    wget https://zenodo.org/record/4147302/files/4_mtb_validation_assemblies.tar?download=1 -O 4_mtb_assemblies.tar
+    tar -xf 4_mtb_assemblies.tar
 
     "$singu_command" python3 analysis/input_data/download_data/mtb_dl_ilmn_ena.py
 ```

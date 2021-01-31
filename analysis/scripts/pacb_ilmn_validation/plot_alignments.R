@@ -22,7 +22,7 @@ theme_set(theme_classic(base_size = 20))
 # turn condition into a factor and reorder it, so that when we facet_wrap the plots,
 # we get the 3D7-based plots on the top row, and the personalised ref plots on the 2nd.
 df2 <-  mutate(df, condition=fct_relevel(as.factor(condition), "baseline_ref","samtools_baseline_ref", "cortex_baseline_ref",gram_commit, "samtools_pers_ref", "cortex_pers_ref"))
-condition.labs=c("3D7", "samtools(3D7)", "cortex(3D7)", "PR", "samtools(PR)", "cortex(PR)")
+condition.labs=c("3D7", "SAMtools(3D7)", "Cortex(3D7)", "PR", "SAMtools(PR)", "Cortex(PR)")
 names(condition.labs)=c("baseline_ref", "samtools_baseline_ref", "cortex_baseline_ref",gram_commit, "samtools_pers_ref", "cortex_pers_ref")
 
 ggplot(data = filter(df2, gene=="EBA175"),  aes(x=NM))+geom_histogram(binwidth=0.005, color = "black", fill = "lightblue", alpha=0.7) + scale_y_continuous(breaks=seq(0,14,1))+ facet_wrap(~condition, labeller=labeller(condition=condition.labs)) +theme_light()+ xlab("scaled edit distance")+ expand_limits(x=c(0,0.15)) + theme(text = element_text(size=18), axis.text.x = element_text(angle=30))
