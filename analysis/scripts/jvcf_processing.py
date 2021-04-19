@@ -148,6 +148,73 @@ def num_sites_under(child_map: Dict, site_idx: str) -> int:
             to_visit.extend(map(str, vals))
     return result
 
+### Convert a jVCF to a VCF ###
+class jVCF_to_VCF:
+    def __init__(self):
+        pass
+
+    def convert(self, jvcf: JVCF, fout):
+        headers = self.make_headers(jvcf)
+        fout.write(headers)
+        for site in jvcf["Sites"]:
+            fout.write(self.convert_one_site(site))
+
+    def make_headers(self, jvcf) -> str:
+        default_double_headers=(
+        "##fileformat=VCFv4.2\n"
+        "##FILTER=<ID=PASS,Description=\"All filters passed\">\n"
+        "##source=jVCF\n"
+        )
+        site_field_headers=""
+        for sf_name,sf in jvcf["Site_Fields"].items():
+            tagname="FORMAT" if sf_name != "FT" else "FILTER"
+            site_field_headers+=f"##{tagname}=<ID={sf_name},Description=\"{sf['Desc']}\">\n"
+
+        samples="\t".join([sample["Name"] for sample in jvcf["Samples"]])
+        sample_header=(
+            f"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t{samples}\n"
+        )
+        return f"{default_double_headers}{site_field_headers}{sample_header}"
+        
+    def convert_one_site(self, site_json: SiteJson) -> str:
+        result=f'{site_json["SEG"]}\t{site_json["POS"]}\t.\t'
+        alleles=site_json["ALS"]
+        if len(alleles) == 0:
+            raise ValueError(f"No alleles in site {site_json}")
+        result += f"{alleles[0]}\t"
+        if len(alleles) == 1:
+            result += ".\t"
+        else:
+            result += ",".join(alleles[1:]) + "\t"
+        result += ".\t.\t.\t" # QUAL, FILTER, INFO, currently not used
+
+        site_wide_fields = {"SEG","POS","ALS","DP"}
+        sample_fields = sorted(set.difference(set(site_json.keys()), site_wide_fields))
+        if len(sample_fields) == 0:
+            raise ValueError(f"No sample-specific fields (not {site_wide_fields}) in site {site_json}")
+        result += ":".join(sample_fields) + "\t" # FORMAT
+
+        num_samples = len(site_json[sample_fields[0]])
+        sample_entries = [[] for _ in range(num_samples)]
+        for sample_field in sample_fields:
+            next_field = site_json[sample_field]
+            for i, sample_value in enumerate(next_field):
+                used_value = sample_value
+                if type(sample_value) is not list: # Some fields have multiple entries per sample, others not; make it uniform.
+                    used_value = [used_value]
+                if sample_field == "FT" and len(used_value) == 0:
+                    used_value = ["PASS"]
+                elif sample_field == "COV":
+                    used_value = [int(val) for val in used_value]
+                if sample_field == "GT":
+                    used_value = ["." if val is None else val for val in used_value]
+                    sample_entries[i].append("/".join(map(str,used_value)))
+                else:
+                    sample_entries[i].append(",".join(map(str,used_value)))
+        serialised_sample_entries = "\t".join(map(lambda entry: ":".join(entry), sample_entries))
+        result += f"{serialised_sample_entries}\n"
+        return result
+
 
 ### Evaluate a genotyped jvcf using a truth jvcf ###
 class FixedDict(dict):
