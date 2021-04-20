@@ -85,11 +85,13 @@ rule all:
         variant_counts=expand(
             f"{output_prg_desc}/{{condition}}_variants.tsv", condition=conditions[0:2]
         ),
-        plots=expand(
+        plots_mapped_regions=expand(
             f"{output_plots}/{{mapper}}/{{calls}}/upset_plot_{GMTOOLS_COMMIT}_unfiltered.pdf",
             mapper=["bowtie2", "minimap2"],
             calls=filters.keys(),
         ),
+        varifier_stats=f"{output_plots}/varifier/stats.tsv",
+        #plots_varifier=f"{output_plots}/varifier/
 
 
 rule index_pacb_assemblies:
@@ -270,4 +272,46 @@ rule tb_plot_alignments:
         f"""
         mkdir -p {output_plots}/{{wildcards.mapper}}/{{wildcards.calls}}
         Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots}/{{wildcards.mapper}}/{{wildcards.calls}} {GMTOOLS_COMMIT}
+        """
+
+rule run_varifier:
+    """Breaks down precision/recall by variant type and size"""
+    input:
+        result_vcf=f"{output_genotyped}/{{condition}}/{{sample}}.vcf.gz",
+        assembly=get_assembly,
+        fasta_ref=config["starting_prg"]["fasta_ref"],
+        var_regions=config["beds"]["with_flank"],
+    output:
+        varifier_run=f"{output_plots}/varifier/{{sample}}/varifier_{{condition}}",
+        varifier_stats=f"{output_plots}/varifier/{{sample}}/stats_{{condition}}.tsv",
+    shadow:
+        "shallow"
+    params:
+        jvcf_converter=f'{config["scripts"]}/{WORKFLOW}/jvcf_to_vcf.py',
+        varifier_stats=f'{config["scripts"]}/{WORKFLOW}/get_varifier_perf_per_record.py',
+    shell:
+        f"""
+        used_vcf={result_vcf}
+        # Convert gramtools jvcf to vcf
+        if [[ {wildcards.sample} =~ gramtools.+ ]]; then
+            jvcf=$(dirname {result_vcf})/../{wildcards.sample}/genotype/genotyped.json
+            python3 {params.jvcf_converter} $jvcf used_vcf.vcf
+            used_vcf=used_vcf.vcf
+        fi
+
+        varifier vcf_eval {input.assembly} {input.fasta_ref} $used_vcf {output.varifier_run}
+        python3 {params.varifier_stats} --tool_name {wildcards.condition} --sample_name {wildcards.sample} --region_file {input.var_regions} {output.varifier_run} {output.varifier_stats}
+        """
+
+
+rule concat_varifier_stats:
+    input:
+        expand(f"{output_plots}/varifier/{{sample}}_stats.tsv",
+                sample=SAMPLES)
+    output:
+        f"{output_plots}/varifier/stats.tsv",
+    shell:
+        f"""
+        python3 {config["scripts"]}/{WORKFLOW}/get_varifier_perf_per_record.py --header > {output}
+        cat {input} >> {output}
         """
