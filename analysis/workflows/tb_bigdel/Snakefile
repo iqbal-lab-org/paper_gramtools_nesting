@@ -40,6 +40,7 @@ output_alignments = output_base / "alignments" / GMTOOLS_COMMIT
 output_ref_index = output_base / "alignments" / "ref_index"
 output_ref_alignments = output_base / "alignments" / "ilmn_alignments_ref"
 output_plots = output_base / f"plots/{GMTOOLS_COMMIT}"
+output_varifier = output_base / "varifier"
 
 conditions = [f"gramtools_{GMTOOLS_COMMIT}", "vg", "graphtyper2", "baseline_ref"]
 output_gmtools = output_genotyped / conditions[0]
@@ -90,7 +91,7 @@ rule all:
             mapper=["bowtie2", "minimap2"],
             calls=filters.keys(),
         ),
-        varifier_stats=f"{output_plots}/varifier/stats.tsv",
+        varifier_stats=f"{output_plots}/varifier/stats_all.tsv",
         #plots_varifier=f"{output_plots}/varifier/
 
 
@@ -274,7 +275,7 @@ rule tb_plot_alignments:
         Rscript {config["scripts"]}/{WORKFLOW}/plot_alignments.R {{input.stats}} {output_plots}/{{wildcards.mapper}}/{{wildcards.calls}} {GMTOOLS_COMMIT}
         """
 
-rule run_varifier:
+rule tb_run_varifier:
     """Breaks down precision/recall by variant type and size"""
     input:
         result_vcf=f"{output_genotyped}/{{condition}}/{{sample}}.vcf.gz",
@@ -282,36 +283,41 @@ rule run_varifier:
         fasta_ref=config["starting_prg"]["fasta_ref"],
         var_regions=config["beds"]["with_flank"],
     output:
-        varifier_run=f"{output_plots}/varifier/{{sample}}/varifier_{{condition}}",
-        varifier_stats=f"{output_plots}/varifier/{{sample}}/stats_{{condition}}.tsv",
+        varifier_json=f"{output_varifier}/{{sample}}/{{condition}}/summary_stats.json",
+        varifier_stats=f"{output_varifier}/{{sample}}/stats_{{condition}}.tsv",
     shadow:
         "shallow"
+    resources:
+        mem_mb=20000
     params:
         jvcf_converter=f'{config["scripts"]}/{WORKFLOW}/jvcf_to_vcf.py',
         varifier_stats=f'{config["scripts"]}/{WORKFLOW}/get_varifier_perf_per_record.py',
+        varifier_run=f"{output_varifier}/{{sample}}/{{condition}}",
     shell:
-        f"""
-        used_vcf={result_vcf}
+        """
+        used_vcf={input.result_vcf}
         # Convert gramtools jvcf to vcf
-        if [[ {wildcards.sample} =~ gramtools.+ ]]; then
-            jvcf=$(dirname {result_vcf})/../{wildcards.sample}/genotype/genotyped.json
+        if [[ {wildcards.condition} =~ gramtools.+ ]]; then
+            jvcf=$(dirname {input.result_vcf})/{wildcards.sample}/genotype/genotyped.json
             python3 {params.jvcf_converter} $jvcf used_vcf.vcf
             used_vcf=used_vcf.vcf
         fi
 
-        varifier vcf_eval {input.assembly} {input.fasta_ref} $used_vcf {output.varifier_run}
-        python3 {params.varifier_stats} --tool_name {wildcards.condition} --sample_name {wildcards.sample} --region_file {input.var_regions} {output.varifier_run} {output.varifier_stats}
+        gzip -dc {input.assembly} > assembly.fa
+        varifier vcf_eval assembly.fa {input.fasta_ref} $used_vcf {params.varifier_run} --force
+        python3 {params.varifier_stats} --tool_name {wildcards.condition} --sample_name {wildcards.sample} --region_file {input.var_regions} {params.varifier_run} {output.varifier_stats}
         """
 
 
-rule concat_varifier_stats:
+rule tb_concat_varifier_stats:
     input:
-        expand(f"{output_plots}/varifier/{{sample}}_stats.tsv",
-                sample=SAMPLES)
+        expand(f"{output_varifier}/{{sample}}/stats_{{condition}}.tsv",
+                sample=SAMPLES,
+                condition=conditions[0:3])
     output:
-        f"{output_plots}/varifier/stats.tsv",
+        f"{output_plots}/varifier/stats_all.tsv",
     shell:
         f"""
-        python3 {config["scripts"]}/{WORKFLOW}/get_varifier_perf_per_record.py --header > {output}
-        cat {input} >> {output}
+        python3 {config["scripts"]}/{WORKFLOW}/get_varifier_perf_per_record.py --header_only > {{output}}
+        cat {{input}} >> {{output}}
         """

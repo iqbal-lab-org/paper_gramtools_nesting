@@ -15,7 +15,7 @@ if [[ -z ${TMPDIR} ]]; then TMPDIR="/hps/nobackup/research/iqbal/bletcher/tmp"; 
 
 # Reduced set of mount points to speed up singularity execution
 # mafft requires a writable /scratch directory
-SINGULARITY_BINDS="/hps/nobackup/research/iqbal,/nfs/research1/zi,${TMPDIR}:/scratch" # noah
+SINGULARITY_BINDS="/hps/nobackup/iqbal,/nfs/research/zi,${TMPDIR}:/scratch" # codon
 #SINGULARITY_BINDS="/hps/nobackup2/iqbal,/nfs/leia/research/iqbal,${TMPDIR}:/scratch" # yoda
 SINGULARITY_ARGS="--contain --bind $SINGULARITY_BINDS"
 

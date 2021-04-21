@@ -63,18 +63,20 @@ def per_record_stats_from_vcf_file(infile):
     stats.sort(key=itemgetter("CHROM", "POS"))
     return stats
 
+
 def load_regions(bed_fname):
     result = defaultdict(list)
     if bed_fname is None:
         return result
     with open(bed_fname) as fin:
         for line in fin:
-           entries = line.split("\t")
-           result[entries[0]].append([int(entries[1])+1,int(entries[2])])
+            entries = line.split("\t")
+            result[entries[0]].append([int(entries[1]) + 1, int(entries[2])])
     return result
 
+
 def is_in_regions(record_stats, regions):
-    if len(regions) == 0: # No filtering by regions
+    if len(regions) == 0:  # No filtering by regions
         return True
     chrom_regions = regions.get(record_stats["CHROM"])
     if chrom_regions is None:
@@ -88,10 +90,12 @@ def is_in_regions(record_stats, regions):
 
 def get_variant_type_and_size(record_stats):
     ref_allele = record_stats["ALS"][0]
-    gtype_call = int(record_stats["GT"].split("/")[0]) # Assumes haploid
+    gtype_call = int(record_stats["GT"].split("/")[0])  # Assumes haploid
     called_allele = record_stats["ALS"][gtype_call]
 
-    variant_size = edlib.align(ref_allele,called_allele,task="distance")["editDistance"]
+    variant_size = edlib.align(ref_allele, called_allele, task="distance")[
+        "editDistance"
+    ]
     len_ref_allele, len_called_allele = len(ref_allele), len(called_allele)
     if len(ref_allele) == len(called_allele):
         variant_type = "SNP" if variant_size == 1 else "MNP"
@@ -103,26 +107,48 @@ def get_variant_type_and_size(record_stats):
     return variant_type, variant_size
 
 
-headers = ["Var_type","Event_size","Sample","Tool","Metric","Classif","Eddist_perf_num","Eddist_perf_denum"]
+headers = [
+    "Var_type",
+    "Event_size",
+    "Sample",
+    "Tool",
+    "Metric",
+    "Classif",
+    "Eddist_perf_num",
+    "Eddist_perf_denum",
+]
+
+
+def print_headers(ctx, param, value):
+    if not value or ctx.resilient_parsing:
+        return
+    print("\t".join(headers))
+    ctx.exit()
+
 
 @click.command()
 @click.argument(
-    "input_dir", type=click.Path(exists=True),
+    "input_dir",
+    type=click.Path(exists=True),
 )
 @click.argument("output_tsv")
-@click.option("--header_only", is_flag=True, help="Produce the header for output_tsv and exit")
+@click.option(
+    "--header_only",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=print_headers,
+    help="Produce the header for output_tsv and exit",
+)
 @click.option("--sample_name", type=str, required=True)
 @click.option("--tool_name", type=str, required=True)
 @click.option("--region_file", type=click.Path(exists=True), default=None)
-def main(input_dir, output_tsv, header_only, sample_name, tool_name, region_file):
-    if header_only:
-        print("\t".join(headers))
-        exit(0)
+def main(input_dir, output_tsv, sample_name, tool_name, region_file):
 
     precision_vcf = Path(input_dir) / "precision.vcf"
     recall_vcf = Path(input_dir) / "recall" / "recall.vcf"
     for fpath in [precision_vcf, recall_vcf]:
-        assert(fpath.exists())
+        assert fpath.exists()
 
     fout_path = Path(output_tsv)
     fout_path.parent.mkdir(exist_ok=True, parents=True)
@@ -130,23 +156,25 @@ def main(input_dir, output_tsv, header_only, sample_name, tool_name, region_file
     regions = load_regions(region_file)
 
     with fout_path.open("w") as fout:
-        for vcf_fname, metric in zip([precision_vcf, recall_vcf],["precision","recall"]):
+        for vcf_fname, metric in zip(
+            [precision_vcf, recall_vcf], ["precision", "recall"]
+        ):
             all_stats = per_record_stats_from_vcf_file(str(vcf_fname))
             for record_stats in all_stats:
                 if not is_in_regions(record_stats, regions):
                     if metric == "precision":
-                        print(record_stats["CHROM"],record_stats["POS"])
+                        print(record_stats["CHROM"], record_stats["POS"])
                     continue
                 var_type, event_size = get_variant_type_and_size(record_stats)
-                if event_size == 0: # Can occur, eg AMBIG call
+                if event_size == 0:  # Can occur, eg AMBIG call
                     continue
                 ed_num, ed_denum = format_dict_to_edit_dist_scores(record_stats)
                 if ed_num is not None:
                     fout.write(
-                            f"{var_type}\t{event_size}\t{sample_name}\t{tool_name}\t"
-                            f'{metric}\t{record_stats["VFR_RESULT"]}\t'
-                            f"{ed_num}\t{ed_denum}\n"
-                            )
+                        f"{var_type}\t{event_size}\t{sample_name}\t{tool_name}\t"
+                        f'{metric}\t{record_stats["VFR_RESULT"]}\t'
+                        f"{ed_num}\t{ed_denum}\n"
+                    )
 
 
 if __name__ == "__main__":
