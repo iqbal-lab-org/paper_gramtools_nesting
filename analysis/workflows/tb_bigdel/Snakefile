@@ -57,6 +57,12 @@ ref_name = Path(config["starting_prg"]["fasta_ref"]).stem
 with open(config["beds"]["with_flank"]) as fin:
     num_regions = len(fin.readlines())
 
+def get_vcf_to_analyse_varifier(wildcards):
+    if wildcards.condition == "input_variants":
+        return f'{config["input_vcf_dir"]}/{wildcards.sample}.vcf.gz'
+    else:
+        return f"{output_genotyped}/{wildcards.condition}/{wildcards.sample}.vcf.gz",
+
 
 localrules:
     all,
@@ -278,7 +284,7 @@ rule tb_plot_alignments:
 rule tb_run_varifier:
     """Breaks down precision/recall by variant type and size"""
     input:
-        result_vcf=f"{output_genotyped}/{{condition}}/{{sample}}.vcf.gz",
+        result_vcf=get_vcf_to_analyse_varifier,
         assembly=get_assembly,
         fasta_ref=config["starting_prg"]["fasta_ref"],
         var_regions=config["beds"]["with_flank"],
@@ -291,20 +297,22 @@ rule tb_run_varifier:
         mem_mb=20000
     params:
         jvcf_converter=f'{config["scripts"]}/{WORKFLOW}/jvcf_to_vcf.py',
+        postprocess_vcf=f'{config["scripts"]}/{WORKFLOW}/postprocess_vcf.py',
         varifier_stats=f'{config["scripts"]}/{WORKFLOW}/get_varifier_perf_per_record.py',
         varifier_run=f"{output_varifier}/{{sample}}/{{condition}}",
     shell:
         """
-        used_vcf={input.result_vcf}
+        input_vcf={input.result_vcf}
         # Convert gramtools jvcf to vcf
         if [[ {wildcards.condition} =~ gramtools.+ ]]; then
             jvcf=$(dirname {input.result_vcf})/{wildcards.sample}/genotype/genotyped.json
-            python3 {params.jvcf_converter} $jvcf used_vcf.vcf
-            used_vcf=used_vcf.vcf
+            python3 {params.jvcf_converter} $jvcf input.vcf
+            input_vcf=input.vcf
         fi
 
+        python3 {params.postprocess_vcf} {input.fasta_ref} $input_vcf used_vcf.vcf --remove_ref_and_null
         gzip -dc {input.assembly} > assembly.fa
-        varifier vcf_eval assembly.fa {input.fasta_ref} $used_vcf {params.varifier_run} --force
+        varifier vcf_eval assembly.fa {input.fasta_ref} used_vcf.vcf {params.varifier_run} --force
         python3 {params.varifier_stats} --tool_name {wildcards.condition} --sample_name {wildcards.sample} --region_file {input.var_regions} {params.varifier_run} {output.varifier_stats}
         """
 
@@ -313,7 +321,7 @@ rule tb_concat_varifier_stats:
     input:
         expand(f"{output_varifier}/{{sample}}/stats_{{condition}}.tsv",
                 sample=SAMPLES,
-                condition=conditions[0:3])
+                condition=conditions[0:3] + ["input_variants"])
     output:
         f"{output_plots}/varifier/stats_all.tsv",
     shell:

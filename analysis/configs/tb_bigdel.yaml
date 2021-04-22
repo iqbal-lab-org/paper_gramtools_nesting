@@ -20,3 +20,4 @@ beds:
 sample_tsv: "analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv"
 assemblies_dir: "analysis/input_data/mtuberculosis/pacb_ilmn/pacb_assemblies"
 ilmn_reads_dir: "analysis/input_data/mtuberculosis/pacb_ilmn/ilmn_reads"
+input_vcf_dir: "analysis/input_data/mtuberculosis/clockwork/vcfs"

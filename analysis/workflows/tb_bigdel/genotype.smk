@@ -167,15 +167,18 @@ rule tb_graphtyper_genotype:
 rule tb_graphtyper_postprocess:
     input:
         vcf=rules.tb_graphtyper_genotype.output.vcf,
+        fasta_ref=config["starting_prg"]["fasta_ref"],
     output:
         gzipped=f"{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz",
         indexed=f"{output_genotyped}/{conditions[2]}/{{sample}}.vcf.gz.csi",
     shadow:
         "shallow"
+    params:
+        postprocess_vcf=f'{config["scripts"]}/{WORKFLOW}/postprocess_vcf.py',
     shell:
         """
-         # Process symbolic alleles for use by bcftools consensus downstream: only DEL is supported
-        gunzip -c {input.vcf} | sed 's/<DEL.*AGGREGATED.*>/<DEL>/' | sed '/<DEL:.*>/ d' | sed '/<INS.*>/ d' > tmp.vcf
+         # Process symbolic alleles for use by bcftools consensus and varifier downstream
+        python3 {params.postprocess_vcf} {input.fasta_ref} {input.vcf} tmp.vcf
 
         # Remove OLD_VARIANT_ID INFO field as it prevents merging
         sed -r 's/OLD_VARIANT_ID=(UNION_BC[0-9a-zA-Z_]+;)+//g' tmp.vcf > no_INFO.vcf

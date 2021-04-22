@@ -32,6 +32,6 @@ bsub -R "select[mem>$MEMORY] rusage[mem=$MEMORY] span[hosts=1]" \
     -e "${LOG_DIR}/${WORKFLOW}.e" \
     -J "${WORKFLOW}_snakemake" \
     snakemake -s analysis/workflows/${WORKFLOW}/Snakefile \
-    --profile lsf --verbose --latency-wait 25 \
+    --profile lsf --verbose --latency-wait 60 \
     --use-singularity #--singularity-args "$SINGULARITY_ARGS"
 
