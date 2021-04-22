@@ -108,6 +108,8 @@ def get_variant_type_and_size(record_stats):
 
 
 headers = [
+    "POS",
+    "CHROM",
     "Var_type",
     "Event_size",
     "Sample",
@@ -160,10 +162,10 @@ def main(input_dir, output_tsv, sample_name, tool_name, region_file):
             [precision_vcf, recall_vcf], ["precision", "recall"]
         ):
             all_stats = per_record_stats_from_vcf_file(str(vcf_fname))
+            num_not_in_region = 0
             for record_stats in all_stats:
                 if not is_in_regions(record_stats, regions):
-                    if metric == "precision":
-                        print(record_stats["CHROM"], record_stats["POS"])
+                    num_not_in_region += 1
                     continue
                 var_type, event_size = get_variant_type_and_size(record_stats)
                 if event_size == 0:  # Can occur, eg AMBIG call
@@ -171,10 +173,12 @@ def main(input_dir, output_tsv, sample_name, tool_name, region_file):
                 ed_num, ed_denum = format_dict_to_edit_dist_scores(record_stats)
                 if ed_num is not None:
                     fout.write(
+                        f'{record_stats["POS"]}\t{record_stats["CHROM"]}\t'
                         f"{var_type}\t{event_size}\t{sample_name}\t{tool_name}\t"
                         f'{metric}\t{record_stats["VFR_RESULT"]}\t'
                         f"{ed_num}\t{ed_denum}\n"
                     )
+            print(f"{metric}:Skipped {num_not_in_region} variants not in {region_file}")
 
 
 if __name__ == "__main__":

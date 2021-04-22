@@ -107,6 +107,33 @@ From: ubuntu:focal
 	pip3 install . && cd .. && rm -r make_prg
 
 
+    ## varifier
+    # varifier dependencies
+    cd ${HOME}
+    wget https://github.com/mummer4/mummer/releases/download/v4.0.0rc1/mummer-4.0.0rc1.tar.gz
+    tar xf mummer-4.0.0rc1.tar.gz
+    rm mummer-4.0.0rc1.tar.gz && cd mummer-4.0.0rc1 && ./configure 
+    make && make install
+    # enable linking to mummer shared lib
+    echo "/usr/local/lib" >> /etc/ld.so.conf 
+    ldconfig
+    cd .. && rm -r mummer-4.0.0rc1
+
+    apt-get install -y libvcflib-tools libcurl4-gnutls-dev libssl-dev
+
+    git clone https://github.com/atks/vt.git vt-git
+    cd vt-git
+    git checkout 2187ff6347086e38f71bd9f8ca622cd7dcfbb40c
+    make
+    cd .. && cp vt-git/vt /usr/local/bin/ && rm -r vt-git
+
+    cd ${HOME}
+    git clone https://github.com/iqbal-lab-org/varifier
+    cd varifier && git checkout 4deeb41cf9c192bdb02ef77a89841f41ea42ed37
+    pip3 install .
+    cd .. && rm -r varifier
+
+
 
 	#/*************/
 	#/* gramtools */
