@@ -5,10 +5,10 @@ WORKFLOW = "make_prgs"
 
 configfile: "analysis/configs/common.yaml"
 ## Switch from one to the other to build each
-#configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
+configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
 
 
-configfile: "analysis/configs/make_prgs/mtuberculosis.yaml"
+#configfile: "analysis/configs/make_prgs/mtuberculosis.yaml"
 
 
 container: config["container"]

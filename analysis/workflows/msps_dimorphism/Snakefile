@@ -51,7 +51,7 @@ rule all:
         ),
 
 
-rule build:
+rule msps_build:
     input:
         prg=config["prg"],
         ref=config["prg_ref"],
@@ -65,7 +65,7 @@ rule build:
 
 rule msps_genotype:
     input:
-        gram_build_done=rules.build.output[0],
+        gram_build_done=rules.msps_build.output[0],
         reads=get_reads,
     output:
         vcf=f"{output_gtyping}/{{sample}}/res.vcf.gz",
@@ -88,7 +88,7 @@ rule msps_genotype:
         """
 
 
-rule combine_calls:
+rule msps_combine_calls:
     """Makes combined JSON for analysing"""
     input:
         expand(f"{output_gtyping}/{{sample}}/res.{{ext}}", sample=samples, ext=["json"]),
@@ -106,7 +106,7 @@ rule combine_calls:
         """
 
 
-rule make_seq_slices:
+rule msps_make_seq_slices:
     input:
         prg_ref=config["prg_ref"],
         genes_bed=config["genes_bed"],
@@ -131,7 +131,7 @@ rule make_seq_slices:
         """
 
 
-rule cat_sequences:
+rule msps_cat_sequences:
     input:
         sequences=expand(
             f"{output_sequences}/{{gene}}/{{sample}}.fa",
@@ -144,9 +144,9 @@ rule cat_sequences:
         "cat {input} > {output}"
 
 
-rule msa_genes:
+rule msps_msa_genes:
     input:
-        rules.cat_sequences.output[0],
+        rules.msps_cat_sequences.output[0],
     output:
         f"{output_msas}/{{gene}}.msa",
     resources:
@@ -155,7 +155,7 @@ rule msa_genes:
         "mafft {input} > {output}"
 
 
-rule phylo_trees:
+rule msps_phylo_trees:
     input:
         f"{output_msas}/{{gene}}.msa",
     output:
@@ -173,7 +173,7 @@ rule phylo_trees:
         """
 
 
-rule build_heatmaps:
+rule msps_build_heatmaps:
     input:
         res_json=f"{output_gtyping}/combined.json",
         genes_bed=config["genes_bed"],
@@ -198,10 +198,10 @@ rule build_heatmaps:
         """
 
 
-rule cluster_dists:
+rule msps_cluster_dists:
     input:
-        sequences=rules.cat_sequences.output,
-        hapg_matrix=rules.build_heatmaps.output.hapg_data,
+        sequences=rules.msps_cat_sequences.output,
+        hapg_matrix=rules.msps_build_heatmaps.output.hapg_data,
     output:
         f"{output_clusters}/{{gene}}_cluster_distmatrix.tsv",
     params:

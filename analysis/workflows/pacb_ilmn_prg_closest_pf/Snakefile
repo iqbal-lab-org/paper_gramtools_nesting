@@ -13,6 +13,7 @@ configfile: "analysis/configs/common.yaml"
 configfile: "analysis/configs/make_prgs/pfalciparum.yaml"
 configfile: "analysis/configs/pacb_ilmn_validation/pfalciparum.yaml"
 
+container: config["container"]
 
 # Get assemblies to process
 include: "../pacb_ilmn_validation/utils.py"
@@ -79,7 +80,7 @@ rule all:
         str(output_base / f"eval_stats_{GMTOOLS_COMMIT}.tsv"),
 
 
-rule make_var_sample_portions:
+rule prg_closest_make_var_sample_portions:
     input:
         var_bed=config["initial_bed"],
         ref_genome=config["genome_fasta"],
@@ -112,7 +113,7 @@ rule make_var_sample_portions:
         """
 
 
-rule cat_var_portions:
+rule prg_closest_cat_var_portions:
     input:
         samples=expand(
             f"{output_portions}/{{sample}}/{{gene}}.fa",
@@ -129,7 +130,7 @@ rule cat_var_portions:
                 fout.write(sequence)
 
 
-rule index_input_seqs:
+rule prg_closest_index_input_seqs:
     input:
         gene_portions=f"{input_sequences_dir}/{{gene}}.fa",
     output:
@@ -142,7 +143,7 @@ rule index_input_seqs:
         """
 
 
-rule index_input_prg:
+rule prg_closest_index_input_prg:
     input:
         prg=f"{input_prgs_dir}/{{gene}}.bin",
     output:
@@ -158,9 +159,9 @@ rule index_input_prg:
         """
 
 
-rule align_to_assemblies:
+rule prg_closest_align_to_assemblies:
     input:
-        gene_portions=rules.cat_var_portions.output.seqs,
+        gene_portions=rules.prg_closest_cat_var_portions.output.seqs,
         index=expand(
             f"{output_bowtie_indexes}/{{assembly}}.{{ext}}",
             ext=bowtie2_idx_extensions,
@@ -176,7 +177,7 @@ rule align_to_assemblies:
         """
 
 
-rule get_stats:
+rule prg_closest_get_stats:
     input:
         alignment_file=f"{output_alignments}/{{assembly}}_{{gene}}.sam",
         var_bed=config["initial_bed"],
@@ -190,7 +191,7 @@ rule get_stats:
         """
 
 
-rule pf_gramtools_induce_in_prg:
+rule prg_closest_pf_gramtools_induce_in_prg:
     input:
         stats_file=f"{output_prelim_stats}/{{assembly}}_{{gene}}.tsv",
         fa=f"{output_fastas}/{{gene}}.fa",
@@ -223,7 +224,7 @@ rule pf_gramtools_induce_in_prg:
         """
 
 
-rule concat_stats:
+rule prg_closest_concat_stats:
     input:
         expand(
             f"{output_alignments}/{{assembly}}_{{gene}}.tsv",
@@ -239,9 +240,9 @@ rule concat_stats:
         """
 
 
-rule pf_evaluate_jvcf:
+rule prg_closest_pf_evaluate_jvcf:
     input:
-        json_truth=rules.pf_gramtools_induce_in_prg.output.json_file,
+        json_truth=rules.prg_closest_pf_gramtools_induce_in_prg.output.json_file,
         json_gtyped=f"{gramtools_genotyped}/{{assembly}}/genotype/genotyped.json",
     output:
         f"{output_eval}/{{assembly}}_{{gene}}.tsv",
@@ -257,7 +258,7 @@ rule pf_evaluate_jvcf:
         """
 
 
-rule concat_evals:
+rule prg_closest_concat_evals:
     input:
         expand(
             f"{output_eval}/{{assembly}}_{{gene}}.tsv", assembly=ASSEMBLIES, gene=GENES,
@@ -273,9 +274,9 @@ rule concat_evals:
         """
 
 
-rule plot_delta_NM:
+rule prg_closest_plot_delta_NM:
     input:
-        closest_prg_stats=rules.concat_stats.output,
+        closest_prg_stats=rules.prg_closest_concat_stats.output,
         validation_stats=validation_stats,
     output:
         expand(f"{output_plots}/{{gene}}_gmtools_delta_mapq_40.pdf", gene=GENES),

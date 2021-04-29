@@ -60,7 +60,8 @@ class BestRead:
 
 @click.command()
 @click.argument(
-    "sam_fname", type=click.Path(exists=True),
+    "sam_fname",
+    type=click.Path(exists=True),
 )
 @click.argument("input_bed", type=click.Path(exists=True))
 @click.argument("output_file", type=str)
@@ -73,6 +74,7 @@ class BestRead:
 def main(sam_fname, input_bed, output_file, min_qlen):
     best_reads = [
         BestRead(min_mapq=0, min_qlen=min_qlen),
+        BestRead(min_mapq=20, min_qlen=min_qlen),
         BestRead(min_mapq=40, min_qlen=min_qlen),
     ]
     samfile = AlignmentFile(sam_fname, "r")
