@@ -116,14 +116,10 @@ make_prgs
 
 No prerequisites.
 
-Run :
+In analysis/workflows/make_prgs, at top of Snakefile, there are two `configfile:` directives, pointing to `pfalciparum.yaml` and `mtuberculosis.yaml`. Uncomment the line corresponding to which analysis to run.
 
-```sh
-    bash analysis/cluster_submit.sh make_prgs
-```
+Now run :
 
-
-In analysis/workflows/make_prgs, at top of Snakefile, there are two `configfile:` directives, pointing to `pfalciparum.yaml` and `mtuberculosis.yaml`. You just ran pfalciparum. Comment out that line, and uncomment the mtuberculosis one.  Run again :
 ```sh
     bash analysis/cluster_submit.sh make_prgs
 ```
@@ -166,5 +162,5 @@ This produces the results of the section: `Application: charting SNPs on top of 
 Development
 ============
 
-While working on the paper, it is not convenient as you have to rebuild and transfer the whole container image if anything changes (eg one line in gramtools). For development, it is best to work with a python `venv` at top-level. Then `pip install -r pyrequirements.txt` and `pip install -r container/pyrequirements.txt`. Then locate gramtools on cluster, cmake/make it, and `pip install -e` it from inside the `venv`. And in the workflows, comment out `container:` line. All tools must be available on cluster.
+While working on the paper, it is not convenient as you have to rebuild and transfer the whole container image if anything changes (eg one line in gramtools). For development, it is best to work with a python `venv` at top-level. Then `pip install -r pyrequirements.txt` and `pip install -r container/pyrequirements.txt`. Then locate gramtools on cluster, cmake/make it, and `pip install -e` it from inside the `venv`. And in the file `analysis/cluster_submit.sh`, remove the `--use-singularity` argument. All tools must be available on cluster.
 
