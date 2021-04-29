@@ -75,7 +75,7 @@ with open(config["beds"]["with_flank"]) as fin:
 
 rule all:
     input:
-        expand(f"{output_plots}/{{gene}}_gmtools_delta_mapq_40.pdf", gene=GENES),
+        f"{output_plots}/closest_input_mapq_20.pdf",
         str(output_base / "closest_stats.tsv"),
         str(output_base / f"eval_stats_{GMTOOLS_COMMIT}.tsv"),
 
@@ -274,13 +274,13 @@ rule prg_closest_concat_evals:
         """
 
 
-rule prg_closest_plot_delta_NM:
+rule prg_closest_plot_closest_input:
     input:
         closest_prg_stats=rules.prg_closest_concat_stats.output,
         validation_stats=validation_stats,
     output:
-        expand(f"{output_plots}/{{gene}}_gmtools_delta_mapq_40.pdf", gene=GENES),
+        f"{output_plots}/closest_input_mapq_20.pdf",
     params:
-        script=f'{config["scripts"]}/pacb_ilmn_prg_closest/process_stats.py',
+        script=f'{config["scripts"]}/pacb_ilmn_prg_closest/plot_stats_closest_input.R',
     shell:
-        f"python3 {{params.script}} {{input.validation_stats}} {{input.closest_prg_stats}} {output_plots} {GMTOOLS_COMMIT}"
+        f"Rscript {{params.script}} {{input.validation_stats}} {{input.closest_prg_stats}} {output_plots} {GMTOOLS_COMMIT}"

@@ -17,7 +17,7 @@ dir.create(output_dir, recursive=TRUE)
 #gmtools_commit <- "124321a0"
 #closest_df <- readr::read_tsv("closest_stats.tsv")
 #validation_df <- readr::read_tsv("validation_stats.tsv")
-output_dir <- "."
+#output_dir <- "."
 
 gmtools_commit <- argv$gramtools_commit
 
@@ -37,6 +37,8 @@ p<-ggplot(filter(merged_df, grepl("mapq_20",condition.y)),aes(x=closest_input_NM
   geom_line(aes(x=closest_input_NM,y=closest_input_NM),linetype=2,alpha=0.8) +
   facet_wrap(vars(gene),scales="free") +
   scale_x_continuous("Distance to truth (closest input)") +
-  scale_y_continuous("Distance to truth (gramtools)")
+  scale_y_continuous("Distance to truth (gramtools)") + 
+  theme(text=element_text(size = 13))
+
 ggsave(paste0(output_dir,"/closest_input_mapq_20.pdf"), p,height=10,width=12)
 
