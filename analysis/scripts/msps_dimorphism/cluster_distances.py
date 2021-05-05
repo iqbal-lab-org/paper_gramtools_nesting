@@ -14,7 +14,7 @@ NUM_SAMPLED_SEQS = 10000
 
 def get_partition(hapg_matrix: click.Path) -> List[str]:
     df = pd.read_csv(hapg_matrix, sep="\t", index_col=0)
-    cl = linkage(df)
+    cl = linkage(df, method="average", metric="euclidean")
     root: ClusterNode = to_tree(cl)
     cur_node = root
     while True:

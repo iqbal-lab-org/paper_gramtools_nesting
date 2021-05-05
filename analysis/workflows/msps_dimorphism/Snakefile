@@ -46,6 +46,7 @@ samples = get_samples(config["sample_tsv"]) # in utils.py
 rule all:
     input:
         heatmaps=expand(f"{output_heatmaps}/{{gene}}_hmap.pdf", gene=genes),
+        phylo_trees=expand(f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}", gene=genes),
         cluster_dists=expand(
             f"{output_clusters}/{{gene}}_cluster_distmatrix.tsv", gene=genes
         ),
@@ -177,6 +178,7 @@ rule msps_build_heatmaps:
     input:
         res_json=f"{output_gtyping}/combined.json",
         genes_bed=config["genes_bed"],
+        metadata_tsv=config["sample_tsv"],
     output:
         hapg_data=f"{output_heatmaps}/{{gene}}_hapgs.tsv",
         plot=f"{output_heatmaps}/{{gene}}_hmap.pdf",
@@ -194,7 +196,7 @@ rule msps_build_heatmaps:
         adj_start=$((${{elems[1]}} + 1))
         reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
 
-        python3 {params.script} {input.res_json} {params.output_prefix} --region $reg
+        python3 {params.script} {input.res_json} {input.metadata_tsv} {params.output_prefix} --region $reg
         """
 
 
