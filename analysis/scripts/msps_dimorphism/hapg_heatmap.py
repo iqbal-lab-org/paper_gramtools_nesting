@@ -21,8 +21,9 @@ SiteIdx = int
 Hapgs = List[int]
 Hapg_Dict = Dict[SiteIdx, Hapgs]
 
-country_to_colour = {"Ghana": "gold", "Laos": "firebrick", "Cambodia": "royalblue"}
-nested_colour_mapping = {True: "gray", False: "navajowhite"}
+from common import country_to_colour, nested_colour_mapping
+
+country_to_colour = {key, val.lower() for key, val in country_to_colour.items()}
 
 
 def get_hapgs_one_site(site_json, num_samples: int) -> Hapgs:

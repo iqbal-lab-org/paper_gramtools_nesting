@@ -14,8 +14,6 @@ def get_samples(sample_tsv: str) -> List[str]:
 
 
 
-
-
 def get_tree_genes(bed_path: str) -> List[str]:
     res = list()
     with open(bed_path) as fin:
