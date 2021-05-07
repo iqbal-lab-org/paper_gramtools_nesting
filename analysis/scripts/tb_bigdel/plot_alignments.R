@@ -3,6 +3,7 @@ library(tibble)
 library(tidyr)
 library(dplyr)
 library(readr)
+library(ggsci)
 library(argparser, quietly=TRUE)
 
 
@@ -11,10 +12,13 @@ p <- add_argument(p, "input_tsv", help="")
 p <- add_argument(p, "output_dir", help="")
 p <- add_argument(p, "gramtools_commit", help="")
 
+
 plot_ecdf <- function(dataset, output_dir, commit, name, with_unmapped = FALSE){
   if (with_unmapped) {
-    max_NM <- max(dataset$NM, na.rm = TRUE)
-    plotted_dataset <- dataset %>% replace_na(list(NM = max_NM))
+    # Replace NA's with a little bit more than each tool's max NM
+    temp <- dataset %>% group_by(tool) %>% mutate(local_max_NM=max(NM,na.rm=TRUE) + 0.02)
+    maxed <- dplyr::coalesce(dataset$NM, temp$local_max_NM)
+    plotted_dataset <- dataset %>% mutate(NM = maxed)
   }
   else {
     plotted_dataset = dataset
@@ -22,8 +26,9 @@ plot_ecdf <- function(dataset, output_dir, commit, name, with_unmapped = FALSE){
   
   ecdf_plot <- ggplot(plotted_dataset, aes(x = NM, colour = tool)) + stat_ecdf(geom="step", 
                                                                                     pad = FALSE) + 
-    ylab("fraction of sequences") + xlab("edit distance") + 
-    theme(text=element_text(size = 13))
+    ylab("Fraction of sequences") + xlab("Edit distance") + labs(colour="Tool") +
+    theme(text=element_text(size = 13)) +
+    scale_colour_lancet() 
   fname <- sprintf("ecdf_plot_%s_%s.pdf", commit, name)
   ggsave(file.path(output_dir,fname),width = 9, height = 6, plot=ecdf_plot)
 }
@@ -71,32 +76,41 @@ gram_commit = argv$gramtools_commit
 outdir = argv$output_dir
 dir.create(outdir)
 
-#df_unfiltered <- as_tibble(read.csv("/tmp/stats.tsv", sep="\t"))
+#setwd("/home/brice/Desktop/main_PhD/analyses/nesting_paper/tmp_work")
+#df_unfiltered <- readr::read_tsv("124321a0/minimap2/callsfilterpass_stats.tsv")
+#gram_commit <- "124321a0"
+#outdir <- "."
+
 df_unfiltered <- as_tibble(read.csv(argv$input_tsv, sep="\t"))
 df_unfiltered <- df_unfiltered %>% rename(tool = condition)
 
 # Remove commit from gramtools condition name
 tools = as.character(unique(df_unfiltered$tool))
 gram_cond = tools[grep("gramtools_*", tools)]
+tool_names <- c("gramtools", "graphtyper2", "vg", "baseline(H37Rv)")
 df_unfiltered$tool = replace(as.vector(df_unfiltered$tool), df_unfiltered$tool == gram_cond, "gramtools")
-df_unfiltered$tool = replace(as.vector(df_unfiltered$tool), df_unfiltered$tool == "baseline_ref", "baseline(H37Rv)")
+df_unfiltered$tool = replace(as.vector(df_unfiltered$tool), df_unfiltered$tool == "baseline_ref", tool_names[4])
+# Order the tools so that the colours come out in the same order as in varifier evaluation plot
+df_unfiltered$tool <- factor(df_unfiltered$tool, levels=tool_names)
 
 # Convert alignment NM below MAPQ threshold to NA
 df_mapq30 <- df_unfiltered
 df_mapq30$NM[df_unfiltered$MAPQ < 30] <- NA
+df_mapq30_capped_NM <- df_mapq30
+df_mapq30_capped_NM$NM[df_mapq30$NM > 0.5 & !is.na(df_mapq30$NM)] <- 0.5
 df_mapq40 <- df_unfiltered
 df_mapq40$NM[df_unfiltered$MAPQ < 40] <- NA
 
+
 ## Plot empirical cumulative distribution functions ##
-plot_ecdf(df_unfiltered, outdir, gram_commit, "unfiltered")
-plot_ecdf(df_unfiltered, outdir, gram_commit, "unfiltered_withunmapped", with_unmapped = TRUE)
-plot_ecdf(df_mapq30, outdir, gram_commit, "filtered_mapq30")
-plot_ecdf(df_mapq30, outdir, gram_commit, "filtered_mapq30_withunmapped", with_unmapped = TRUE)
-plot_ecdf(df_mapq40, outdir, gram_commit, "filtered_mapq40")
-plot_ecdf(df_mapq40, outdir, gram_commit, "filtered_mapq40_withunmapped", with_unmapped = TRUE)
+plot_ecdf(df_unfiltered, outdir, gram_commit, "unfiltered", with_unmapped = TRUE)
+plot_ecdf(df_mapq30, outdir, gram_commit, "filtered_mapq30", with_unmapped = TRUE)
+plot_ecdf(df_mapq30_capped_NM, outdir, gram_commit, "filtered_mapq30_maxNM0.5", with_unmapped = TRUE)
+plot_ecdf(df_mapq40, outdir, gram_commit, "filtered_mapq40", with_unmapped = TRUE)
 
 write_mean_eddist(df_unfiltered, outdir, gram_commit, "unfiltered")
 write_mean_eddist(df_mapq30, outdir, gram_commit, "filtered_mapq30")
+write_mean_eddist(df_mapq30_capped_NM, outdir, gram_commit, "filtered_mapq30_maxNM0.5")
 write_mean_eddist(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 
 
@@ -109,11 +123,8 @@ library(UpSetR)
 #    - Keeps mapped sequences where delta_MAPQ is NA: this means we recover a seq that baseline_ref did not
 #    - Keeps mapped sequences only if delta_MAPQ is not negative: removes worse alignments
 
-plot_upset(df_unfiltered, outdir, gram_commit, "unfiltered")
 plot_upset(df_unfiltered, outdir, gram_commit, "unfiltered_unmapped", plot_missing = TRUE)
-plot_upset(df_mapq30, outdir, gram_commit, "filtered_mapq30")
 plot_upset(df_mapq30, outdir, gram_commit, "filtered_mapq30_unmapped", plot_missing = TRUE)
-plot_upset(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 plot_upset(df_mapq40, outdir, gram_commit, "filtered_mapq40_unmapped", plot_missing = TRUE)
 
 write_num_aligned(df_unfiltered, outdir, gram_commit, "unfiltered")

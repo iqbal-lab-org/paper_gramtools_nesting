@@ -11,5 +11,5 @@ install_if_absent <- function(x){
 	}
 }
 
-required <- c("argparser", "UpSetR", "tibble", "dplyr", "readr", "forcats", "purrr", "tidyr", "ggplot2", "rjson")
+required <- c("argparser", "UpSetR", "tibble", "dplyr", "readr", "forcats", "purrr", "tidyr", "ggplot2", "rjson","ggsci")
 install_if_absent(required)
