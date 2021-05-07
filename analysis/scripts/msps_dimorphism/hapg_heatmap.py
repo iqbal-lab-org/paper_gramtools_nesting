@@ -14,16 +14,22 @@ from jvcf_processing import (
     Region,
     click_get_region,
     is_in_region,
-    first_idx_in_region,
+    first_idx_in_region_non_nested,
+)
+from common import (
+        get_partition, 
+        country_to_colour, 
+        nested_colour_mapping,
+        marker_colours,
+        allelic_distinguishability,
+        allelic_specificity
 )
 
 SiteIdx = int
 Hapgs = List[int]
 Hapg_Dict = Dict[SiteIdx, Hapgs]
 
-from common import country_to_colour, nested_colour_mapping
-
-country_to_colour = {key, val.lower() for key, val in country_to_colour.items()}
+country_to_colour = {key: val.lower() for key, val in country_to_colour.items()}
 
 
 def get_hapgs_one_site(site_json, num_samples: int) -> Hapgs:
@@ -47,12 +53,8 @@ def get_hapgs_all_sites(jvcf, region: Region) -> Hapg_Dict:
 
     site_is_nested = list()
 
-    first_idx = first_idx_in_region(jvcf["Sites"], region)
-    # If the first idx is not at lvl1, we can get a site following the first one which has a smaller POS and that is not in target region
-    while first_idx not in lvl1_sites:
-        first_idx += 1
+    first_idx = first_idx_in_region_non_nested(jvcf, region)
     cur_idx = first_idx
-
     while is_in_region(jvcf["Sites"][cur_idx], region):
         result[cur_idx - first_idx] = get_hapgs_one_site(
             jvcf["Sites"][cur_idx], num_samples
@@ -69,6 +71,33 @@ def get_hapgs_all_sites(jvcf, region: Region) -> Hapg_Dict:
     result["nested"] = site_is_nested
     return result
 
+
+def get_dimorphism_calls(hapg_matrix_file, region, jvcf):
+    """ Partition genotype calls based on dimorphic form """
+    groups=get_partition(hapg_matrix_file)
+    sample_to_dimorphic = {sample_name: "form1" for sample_name in groups[0]}
+    sample_to_dimorphic.update({sample_name: "form2" for sample_name in groups[1]})
+    
+    first_idx = first_idx_in_region_non_nested(jvcf, region)
+        
+    dimorphism_calls = defaultdict(list)
+    cur_idx = first_idx
+    while is_in_region(jvcf["Sites"][cur_idx], region):
+        dimorphism_site_calls = defaultdict(list)
+        site = jvcf["Sites"][cur_idx]
+        gts = [gt[0] for gt in site["GT"]]
+        for sample_idx, gt in enumerate(gts):
+            sample_name = jvcf["Samples"][sample_idx]["Name"]
+            try:
+                form = sample_to_dimorphic[sample_name]
+                dimorphism_site_calls[form].append(gt)
+            except KeyError:
+                pass
+
+        for key,val in dimorphism_site_calls.items():
+            dimorphism_calls[key].append(val)
+        cur_idx += 1
+    return dimorphism_calls
 
 def get_country_colouring(metadata_fname, df):
     """Loads sample metadata and assigns country colouring"""
@@ -92,10 +121,8 @@ def get_cell_colouring(df):
     colourmap = [null_hapg_colour] + [cmap(x) for x in to_map]
     return colourmap
 
-def add_clustermap_legends(hmap, num_colours):
-    """Adds row, colour, and cell colour legends to clustermap
-    See https://stackoverflow.com/q/27988846/12519542 for some of the code for this
-    """
+### Colourbars in clustermaps ###
+def customise_cbar(hmap, num_colours):
     cbar = hmap.ax_heatmap.collections[0].colorbar
     r = cbar.vmax - cbar.vmin
     cbar.set_ticks(
@@ -105,17 +132,30 @@ def add_clustermap_legends(hmap, num_colours):
         ]
     )
     cbar.set_ticklabels(list(range(-1, num_colours - 1)))
-
-
+    
+def add_nested_site_legend(hmap):
     for label,colour in nested_colour_mapping.items():
         hmap.ax_col_dendrogram.bar(0, 0, color=colour, label=label, linewidth=0)
+    l1 = hmap.ax_col_dendrogram.legend(title='Nested site', loc="center", ncol=1, bbox_to_anchor=(0.6, 0.87), bbox_transform=gcf().transFigure)
+    
 
-    l1 = hmap.ax_col_dendrogram.legend(title='Nested site', loc="center", ncol=1, bbox_to_anchor=(0.6, 0.88), bbox_transform=gcf().transFigure)
+def add_clustermap_legends(hmap, num_colours, countries = True):
+    """See https://stackoverflow.com/q/27988846/12519542 for an excellent tutorial through this"""
 
-    for label,colour in country_to_colour.items():
-        hmap.ax_row_dendrogram.bar(0, 0, color=colour, label=label, linewidth=0)
+    customise_cbar(hmap, num_colours)
+    add_nested_site_legend(hmap)
+    
+    if countries:
+        for label,colour in country_to_colour.items():
+            hmap.ax_row_dendrogram.bar(0, 0, color=colour, label=label, linewidth=0)
+        l2 = hmap.ax_row_dendrogram.legend(title='Sample country', loc="center", ncol=1, bbox_to_anchor=(0.25, 0.87), bbox_transform=gcf().transFigure)
+    else:
+        for label,colour in marker_colours.items():
+            hmap.ax_row_dendrogram.bar(0, 0, color=colour, label=label, linewidth=0)
+        l2 = hmap.ax_row_dendrogram.legend(title='Dimorphism specificity (top row)\nDimorphism sensitivity (bottom row)', loc="center left", 
+                                           ncol=2, bbox_to_anchor=(0.05, 0.87), bbox_transform=gcf().transFigure)
 
-    l2 = hmap.ax_row_dendrogram.legend(title='Sample country', loc="center", ncol=1, bbox_to_anchor=(0.25, 0.88), bbox_transform=gcf().transFigure)
+    hmap.ax_heatmap.set(xlabel="Variant sites",ylabel="Samples")
 
 
 @click.command()
@@ -143,6 +183,7 @@ def main(
     metadata_file: click.Path,
     output_prefix: str,
 ):
+    CBAR_POS = (1.04, 0.55, 0.05, 0.18)
     output_prefix = Path(output_prefix)
 
     with open(jvcf_input) as fin:
@@ -153,7 +194,8 @@ def main(
     site_is_nested = hapgs_all_sites.pop("nested")
     sample_names = [sample["Name"] for sample in jvcf["Samples"]]
     df = pd.DataFrame(hapgs_all_sites, index=sample_names)
-    df.to_csv(f"{output_prefix}_hapgs.tsv", sep="\t")
+    hapg_matrix_file = f"{output_prefix}_hapgs.tsv" 
+    df.to_csv(hapg_matrix_file, sep="\t")
 
     #### Get colourings ####
     ## Cell colouring: according to haplogroup
@@ -164,7 +206,7 @@ def main(
 
     ## Column colouring: colour sites by whether they are nested
     site_is_nested = pd.Series(site_is_nested)
-    site_colours = site_is_nested.map(nested_colour_mapping)
+    nested_colours = site_is_nested.map(nested_colour_mapping)
 
     ## row-clustered clustermap
     hmap_clustered = sns.clustermap(
@@ -174,10 +216,10 @@ def main(
     col_cluster=False,
     yticklabels=False,
     cmap=cell_colourmap,
-    col_colors=site_colours,
+    col_colors=nested_colours,
     row_colors=country_colours,
     cbar_kws={"label":"haplogroup"},
-    cbar_pos=(1.05, 0.35, 0.05, 0.18)
+    cbar_pos=CBAR_POS,
 )
     add_clustermap_legends(hmap_clustered, len(cell_colourmap))
     hmap_clustered.savefig(f"{output_prefix}_hmap_clustered.pdf")
@@ -191,13 +233,54 @@ def main(
     row_cluster=False,
     yticklabels=False,
     cmap=cell_colourmap,
-    col_colors=site_colours,
+    col_colors=nested_colours,
     row_colors=country_colours,
     cbar_kws={"label":"haplogroup"},
-    cbar_pos=(1.05, 0.35, 0.05, 0.18)
+    cbar_pos=CBAR_POS,
     )
     add_clustermap_legends(hmap, len(cell_colourmap))
     hmap.savefig(f"{output_prefix}_hmap.pdf")
+
+    ## clustermap with site-level dimorphism sensitivity and specificity ###
+    dimorphism_calls = get_dimorphism_calls(hapg_matrix_file, region, jvcf)
+    ## Compute measures of per-site dimorphism
+    dimorphism_sensitivity = []
+    dimorphism_specificity = []
+    num_sites = len(list(dimorphism_calls.values())[0])
+    for site_idx in range(num_sites):
+        form1_gts = dimorphism_calls["form1"][site_idx]
+        form2_gts = dimorphism_calls["form2"][site_idx]
+        dimorphism_sensitivity.append(allelic_distinguishability(form1_gts,form2_gts))
+        dimorphism_specificity.append(allelic_specificity(form1_gts,form2_gts))
+
+    fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
+    axs[0].hist(dimorphism_sensitivity)
+    axs[0].set(title="Dimorphism sensitivity", xlabel="value",ylabel="Number of sites")
+    axs[1].hist(dimorphism_specificity)
+    axs[1].set(title="Dimorphism specificity", xlabel="value")
+    fig.savefig(f"{output_prefix}_marker_histogram.pdf")
+
+    dimo_sensi_colour = [marker_colours["High"] if val > 0.8 else marker_colours["Low"] for val in dimorphism_sensitivity]
+    dimo_speci_colour = list()
+    for val in dimorphism_specificity:
+        if val > 0.3 or val < -0.3:
+            dimo_speci_colour.append(marker_colours["High"])
+        else:
+            dimo_speci_colour.append(marker_colours["Low"])   
+
+    hmap_with_markers = sns.clustermap(
+        df,
+        method="average",
+        metric="euclidean",
+        col_cluster=False,
+        yticklabels=False,
+        cmap=cell_colourmap,
+        col_colors=[dimo_speci_colour, nested_colours, dimo_sensi_colour],
+        cbar_kws={"label":"haplogroup"},
+        cbar_pos=(1.04, 0.55, 0.05, 0.18)
+    )
+    add_clustermap_legends(hmap_with_markers, len(cell_colourmap), countries=False)
+    hmap_with_markers.savefig(f"{output_prefix}_hmap_with_markers.pdf")
 
 if __name__ == "__main__":
     main()

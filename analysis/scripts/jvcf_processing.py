@@ -72,6 +72,14 @@ def first_idx_in_region(sites_json: SiteJsons, region: Region) -> int:
 
     return result
 
+def first_idx_in_region_non_nested(jvcf, region):
+    first_idx = first_idx_in_region(jvcf["Sites"], region)
+    # If the first idx is not at lvl1, we can get a site following the first one which has a smaller POS and that is not in target region
+    lvl1_sites = jvcf["Lvl1_Sites"]
+    while first_idx not in lvl1_sites:
+        first_idx += 1
+    return first_idx
+
 
 def get_sites_in_region(sites_json: SiteJsons, region: Region) -> SiteJsons:
     first_idx = first_idx_in_region(sites_json, region)
