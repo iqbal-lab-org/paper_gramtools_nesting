@@ -97,9 +97,10 @@ rule all:
             mapper=["bowtie2", "minimap2"],
             calls=filters.keys(),
         ),
-        varifier_stats=f"{output_plots}/varifier/stats_all.tsv",
-        #plots_varifier=f"{output_plots}/varifier/
-
+        varifier_plots=expand(
+                f"{output_plots}/varifier/{{filtering}}/genome_graph_impact.pdf",
+                filtering=["nofilter","filterpass"],
+        )
 
 rule index_pacb_assemblies:
     input:
@@ -289,8 +290,8 @@ rule tb_run_varifier:
         fasta_ref=config["starting_prg"]["fasta_ref"],
         var_regions=config["beds"]["with_flank"],
     output:
-        varifier_json=f"{output_varifier}/{{sample}}/{{condition}}/summary_stats.json",
-        varifier_stats=f"{output_varifier}/{{sample}}/stats_{{condition}}.tsv",
+        varifier_json=f"{output_varifier}/{{filtering}}/{{sample}}/{{condition}}/summary_stats.json",
+        varifier_stats=f"{output_varifier}/{{filtering}}/{{sample}}/stats_{{condition}}.tsv",
     shadow:
         "shallow"
     resources:
@@ -299,7 +300,7 @@ rule tb_run_varifier:
         jvcf_converter=f'{config["scripts"]}/{WORKFLOW}/jvcf_to_vcf.py',
         postprocess_vcf=f'{config["scripts"]}/{WORKFLOW}/postprocess_vcf.py',
         varifier_stats=f'{config["scripts"]}/{WORKFLOW}/get_varifier_perf_per_record.py',
-        varifier_run=f"{output_varifier}/{{sample}}/{{condition}}",
+        varifier_run=f"{output_varifier}/{{filtering}}/{{sample}}/{{condition}}",
     shell:
         """
         input_vcf={input.result_vcf}
@@ -312,20 +313,39 @@ rule tb_run_varifier:
 
         python3 {params.postprocess_vcf} {input.fasta_ref} $input_vcf used_vcf.vcf --remove_ref_and_null
         gzip -dc {input.assembly} > assembly.fa
-        varifier vcf_eval assembly.fa {input.fasta_ref} used_vcf.vcf {params.varifier_run} --force
+        filtering=""
+        if [[ {wildcards.filtering} == "filterpass" ]]; then
+            filtering="--filter_pass .,PASS"
+        fi
+        varifier vcf_eval assembly.fa {input.fasta_ref} used_vcf.vcf {params.varifier_run} --force $filtering
         python3 {params.varifier_stats} --tool_name {wildcards.condition} --sample_name {wildcards.sample} --region_file {input.var_regions} {params.varifier_run} {output.varifier_stats}
         """
 
 
 rule tb_concat_varifier_stats:
     input:
-        expand(f"{output_varifier}/{{sample}}/stats_{{condition}}.tsv",
+        expand(f"{output_varifier}/{{filtering}}/{{sample}}/stats_{{condition}}.tsv",
                 sample=SAMPLES,
-                condition=conditions[0:3] + ["input_variants"])
+                condition=conditions[0:3] + ["input_variants"], allow_missing=True)
     output:
-        f"{output_plots}/varifier/stats_all.tsv",
+        f"{output_plots}/varifier/{{filtering}}/stats_all.tsv",
     shell:
         f"""
         python3 {config["scripts"]}/{WORKFLOW}/get_varifier_perf_per_record.py --header_only > {{output}}
         cat {{input}} >> {{output}}
         """
+
+rule tb_plot_varifier_stats:
+    input:
+        varifier_stats=rules.tb_concat_varifier_stats.output,
+        var_regions=config["beds"]["with_flank"],
+    output:
+        f"{output_plots}/varifier/{{filtering}}/genome_graph_impact.pdf"
+    params:
+        script=f'{config["scripts"]}/{WORKFLOW}/plot_varifier.R',
+        output_dir=f"{output_plots}/varifier/{{filtering}}"
+    shell:
+        """
+        Rscript {params.script} {input.varifier_stats} {params.output_dir} {input.var_regions}
+        """
+

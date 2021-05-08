@@ -25,6 +25,7 @@ output_gtyping = output_base / "gtyping"
 output_msas = output_base / "msas"
 output_sequences = output_msas / "sequences"
 output_trees = output_base / "phylo_trees"
+output_tree_plots = output_base / "phylo_trees" / "plots"
 # output_drawn_trees = output_trees / "plots"
 output_graphs = output_base / "graphs"
 output_heatmaps = output_base / "heatmaps"
@@ -46,6 +47,7 @@ rule all:
     input:
         heatmaps=expand(f"{output_heatmaps}/{{gene}}_hmap.pdf", gene=genes),
         phylo_trees=expand(f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}", gene=genes),
+        phylo_plots=expand(f"{output_tree_plots}/{{gene}}_tree.pdf", gene=genes),
         cluster_dists=expand(
             f"{output_clusters}/{{gene}}_cluster_distmatrix.tsv", gene=genes
         ),
@@ -155,23 +157,6 @@ rule msps_msa_genes:
         "mafft {input} > {output}"
 
 
-rule msps_phylo_trees:
-    input:
-        f"{output_msas}/{{gene}}.msa",
-    output:
-        f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}",
-    params:
-        outdir=f"{output_trees}/{{gene}}",
-    resources:
-        mem_mb=10000,
-    threads: 8
-    shell:
-        """
-        if [ ! -e {output} ]; then
-            raxmlHPC-PTHREADS -s {input} -n {wildcards.gene} -m GTRCAT -p 42 --no-seq-check -w $(realpath {params.outdir}) -T {threads}
-        fi
-        """
-
 
 rule msps_build_heatmaps:
     input:
@@ -196,6 +181,39 @@ rule msps_build_heatmaps:
         reg="${{elems[0]}}:${{adj_start}}-${{elems[2]}}"
 
         python3 {params.script} {input.res_json} {input.metadata_tsv} {params.output_prefix} --region $reg
+        """
+
+rule msps_phylo_trees:
+    input:
+        f"{output_msas}/{{gene}}.msa",
+    output:
+        f"{output_trees}/{{gene}}/RAxML_bestTree.{{gene}}",
+    params:
+        outdir=f"{output_trees}/{{gene}}",
+    resources:
+        mem_mb=10000,
+    threads: 8
+    shell:
+        """
+        if [ ! -e {output} ]; then
+            raxmlHPC-PTHREADS -s {input} -n {wildcards.gene} -m GTRCAT -p 42 --no-seq-check -w $(realpath {params.outdir}) -T {threads}
+        fi
+        """
+
+rule msps_phylo_tree_plots:
+    input:
+        phylo_tree=rules.msps_phylo_trees.output,
+        hapg_matrix=rules.msps_build_heatmaps.output.hapg_data,
+        metadata_tsv=config["sample_tsv"],
+    output:
+        f"{output_tree_plots}/{{gene}}_tree.pdf"
+    params:
+        script=f'{config["scripts"]}/{WORKFLOW}/plot_tree.py',
+        output_prefix=f"{output_tree_plots}/{{gene}}"
+    shell:
+        """
+        export QT_QPA_PLATFORM=offscreen
+        python3 {params.script} {input.hapg_matrix} {input.phylo_tree} {input.metadata_tsv} {params.output_prefix}
         """
 
 
