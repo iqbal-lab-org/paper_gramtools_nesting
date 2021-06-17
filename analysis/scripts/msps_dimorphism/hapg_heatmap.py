@@ -223,6 +223,7 @@ def main(
 )
     add_clustermap_legends(hmap_clustered, len(cell_colourmap))
     hmap_clustered.savefig(f"{output_prefix}_hmap_clustered.pdf")
+    hmap_clustered.savefig(f"{output_prefix}_hmap_clustered.svg")
 
     ## non-row-clustered clustermap, for comparison with above
     hmap = sns.clustermap(
