@@ -28,7 +28,7 @@ plot_ecdf <- function(dataset, output_dir, commit, name, with_unmapped = FALSE){
                                                                                     pad = FALSE) + 
     ylab("Fraction of sequences") + xlab("Edit distance") + labs(colour="Tool") +
     theme(text=element_text(size = 13)) +
-    scale_colour_lancet() 
+    scale_colour_lancet()
   fname <- sprintf("ecdf_plot_%s_%s.pdf", commit, name)
   ggsave(file.path(output_dir,fname),width = 9, height = 6, plot=ecdf_plot)
 }
@@ -148,7 +148,7 @@ write_num_aligned(df_mapq40, outdir, gram_commit, "filtered_mapq40")
 ### Minimap2 results: look at unmapped, low mapq, and gramtools high edit distance sequences ##
 #df_unfiltered_minimap2 <- as_tibble(read.csv("/home/brice/Desktop/main_PhD/analyses/nesting_paper/analysis/outputs/tb_bigdel/plots/124321a0/minimap2/callsfilterpass_stats.tsv",sep="\t"))
 # Num sequences mapped with edit distance of 0
-#df_unfiltered_minimap2 %>% filter(NM == 0) %>% group_by(tool) %>% summarise(n())
+#df_mapq30 %>% filter(NM == 0) %>% group_by(tool) %>% summarise(n()/765)
 #df_lowmapq_minimap2 <- df_unfiltered_minimap2 %>% filter(!is.na(MAPQ) & MAPQ<=40)
 #df_mapq_minimap2 <- df_unfiltered_minimap2
 #df_mapq_minimap2$NM[df_mapq_minimap2$MAPQ < 30] <- NA
