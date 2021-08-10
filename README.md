@@ -1,6 +1,6 @@
 Intro
 ======
-This is the repository for the paper *Enabling multiscale variation analysis with genome graphs*. 
+This is the repository for the paper *Gramtools enables multiscale variation analysis with genome graphs*. 
 
 It is divided into snakemake workflows, one folder each in analysis/workflows.
 
@@ -17,17 +17,19 @@ Requirements for setup
 Input data
 ------------
 
-Here we list all the datasets used; for each, either public accessions are stored in a file or the data is available for download on Zenodo. 
+Here we list all the datasets used; for each, either public accessions are stored in a file or the data is available for download on [Zenodo][Zenodo].
 We provide scripts and commands to obtain all the data, see [below](#Steps-for-setup).
 
 Data                      | Access
 ----                      | -----
-*M. tuberculosis* vcfs of 1,017 samples | Zenodo
-*P. falciparum* vcfs of 2,498 samples | Zenodo
-*M. tuberculosis* validation PacBio assemblies of 17 samples | Zenodo
+*M. tuberculosis* vcfs of 1,017 samples | [Zenodo][Zenodo]
+*P. falciparum* vcfs of 2,498 samples | [Zenodo][Zenodo]
+*M. tuberculosis* validation PacBio assemblies of 17 samples | [Zenodo][Zenodo]
 *M. tuberculosis* validation Illumina read sets of 17 samples | ENA accessions listed in `analysis/input_data/mtuberculosis/pacb_ilmn/data_accessions.tsv`
 *P. falciparum* 14 Illumina read sets and matched PacBio assemblies | ENA accessions listed in `analysis/input_data/pfalciparum/pacb_ilmn/data_accessions.tsv`
 *P. falciparum* 706 Illumina read sets from Pf3k release 5 | ENA accessions listed in `analysis/input_data/pfalciparum/pf3k/pf3k_release_5.tsv`
+
+[Zenodo]: https://doi.org/10.5281/zenodo.5075458
 
 
 Steps for setup
@@ -48,7 +50,7 @@ Obtain the singularity container:
 
 ```sh
     # Download container:
-    mkdir -p container/built && wget https://zenodo.org/record/4147302/files/1_container.sif?download=1 -O container/built/singu.sif
+    mkdir -p container/built && wget https://zenodo.org/record/5075458/files/1_container.sif?download=1 -O container/built/singu.sif
     # It is possible to build the container directly; this should take ~30 minutes:
     # sudo singularity build --no-cleanup container/built/singu.sif container/singu_def.def 
 ```
@@ -68,16 +70,16 @@ Obtain the input data:
 
     pf_vcfs="analysis/input_data/pfalciparum/pf3k/vcfs"
     mkdir -p "$pf_vcfs"
-    wget https://zenodo.org/record/4147302/files/3_pf_vcfs.tar?download=1  -O 3_pf_vcfs.tar
+    wget https://zenodo.org/record/5075458/files/3_pf_vcfs.tar?download=1  -O 3_pf_vcfs.tar
     tar -xf 3_pf_vcfs.tar
 
     ## M. tuberculosis data ##
     tb_vcfs="analysis/input_data/mtuberculosis/clockwork/vcfs"
     mkdir -p "$tb_vcfs"
     
-    wget https://zenodo.org/record/4147302/files/2_mtb_vcfs.tar?download=1 -O 2_mtb_vcfs.tar
+    wget https://zenodo.org/record/5075458/files/2_mtb_vcfs.tar?download=1 -O 2_mtb_vcfs.tar
     tar -xf 2_mtb_vcfs.tar
-    wget https://zenodo.org/record/4147302/files/4_mtb_validation_assemblies.tar?download=1 -O 4_mtb_assemblies.tar
+    wget https://zenodo.org/record/5075458/files/4_mtb_validation_assemblies.tar?download=1 -O 4_mtb_assemblies.tar
     tar -xf 4_mtb_assemblies.tar
 
     "$singu_command" python3 analysis/input_data/download_data/mtb_dl_ilmn_ena.py
